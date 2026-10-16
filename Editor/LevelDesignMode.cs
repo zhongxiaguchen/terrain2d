@@ -1,5 +1,4 @@
 using UnityEditor;
-using UnityEditor.Overlays;
 using UnityEngine;
 
 namespace Terrain2D.EditorTools
@@ -11,8 +10,7 @@ namespace Terrain2D.EditorTools
     /// while laying out a level and in the way the rest of the time — when you are checking
     /// art, taking a screenshot, or recording. This is one switch to turn the lot off.
     ///
-    /// The state lives in EditorPrefs so it survives domain reloads and editor restarts. The
-    /// overlay itself is never hidden, otherwise there would be no way to switch it back on.
+    /// The state lives in EditorPrefs so it survives domain reloads and editor restarts.
     /// </summary>
     internal static class LevelDesignMode
     {
@@ -59,64 +57,58 @@ namespace Terrain2D.EditorTools
     }
 
     /// <summary>
-    /// The Scene view toolbar entry for <see cref="LevelDesignMode"/>.
+    /// The 关卡设计 switch, drawn just under the Scene view toolbar.
     ///
-    /// The Scene view toolbar is built from overlays (Unity 2021.2+), and IMGUIOverlay lets this
-    /// one be written with plain GUILayout instead of UI Toolkit. defaultDockZone puts it in the
-    /// toolbar strip at the top; defaultDisplay is what makes it appear there at all — without
-    /// it the overlay is created but stays hidden.
+    /// This deliberately does NOT use the Scene view overlay system. An IMGUIOverlay with
+    /// defaultDisplay and defaultDockZone = DockZone.TopToolbar was tried twice and never
+    /// appeared: it compiled, it threw nothing, SceneView.AddOverlayToActiveView was called —
+    /// and the button still never showed up. Without a way to debug the editor's overlay layout
+    /// from outside, guessing a third time was not worth it.
+    ///
+    /// So this uses exactly the same technique as the terrain toolbar at the bottom of the
+    /// viewport, which is known to work here: SceneView.duringSceneGui, Handles.BeginGUI, and a
+    /// GUILayout area anchored to the edge. The trade-off is that the buttons sit directly under
+    /// the toolbar rather than inside it.
     /// </summary>
-    [Overlay(typeof(SceneView), OverlayId, DisplayName,
-             defaultDisplay = true, defaultDockZone = DockZone.TopToolbar)]
-    internal class LevelDesignOverlay : IMGUIOverlay
+    [InitializeOnLoad]
+    internal static class LevelDesignToolbar
     {
-        const string OverlayId = "Terrain2D/Level Design";
-        const string DisplayName = "关卡设计";
+        // The Scene view overlay toolbar occupies roughly the top 22 px of the view rect.
+        const float ToolbarHeight = 22f;
 
-        public override void OnGUI()
+        static LevelDesignToolbar()
         {
+            SceneView.duringSceneGui -= OnSceneGui;
+            SceneView.duringSceneGui += OnSceneGui;
+        }
+
+        static void OnSceneGui(SceneView view)
+        {
+            if (view == null) return;
+            if (Event.current == null) return;
+
+            Rect viewRect = view.position;
+
+            Handles.BeginGUI();
+
+            // A single row pinned right under the toolbar, sized to its contents.
+            GUILayout.BeginArea(new Rect(8f, ToolbarHeight, viewRect.width - 16f, 26f));
             GUILayout.BeginHorizontal();
 
             bool enabled = LevelDesignMode.Enabled;
             bool toggled = GUILayout.Toggle(
-                enabled, "关卡设计", EditorStyles.toolbarButton, GUILayout.Width(72f));
+                enabled, "关卡设计", EditorStyles.miniButton, GUILayout.Width(72f));
             if (toggled != enabled) LevelDesignMode.Enabled = toggled;
 
-            if (GUILayout.Button("选中地形", EditorStyles.toolbarButton, GUILayout.Width(72f)))
+            if (GUILayout.Button("选中地形", EditorStyles.miniButton, GUILayout.Width(72f)))
                 LevelDesignMode.FocusTerrain();
 
+            GUILayout.FlexibleSpace();
+
             GUILayout.EndHorizontal();
-        }
-    }
+            GUILayout.EndArea();
 
-    /// <summary>
-    /// Puts the overlay into the Scene view the first time this package is loaded.
-    ///
-    /// defaultDisplay only applies the first time an overlay is created, and Unity has usually
-    /// already recorded a layout for it by then — so relying on the attribute alone leaves the
-    /// button invisible with no hint that it exists. AddOverlayToActiveView puts it in the last
-    /// focused Scene view and keeps it there.
-    ///
-    /// Runs once, guarded by an EditorPrefs flag: after that the user's own layout wins, so
-    /// hiding the overlay sticks instead of being undone on every domain reload.
-    /// </summary>
-    [InitializeOnLoad]
-    internal static class LevelDesignOverlayInstaller
-    {
-        const string InstalledKey = "Terrain2D.LevelDesignOverlayInstalled";
-
-        static LevelDesignOverlayInstaller()
-        {
-            if (EditorPrefs.GetBool(InstalledKey, false)) return;
-            EditorApplication.delayCall += Install;
-        }
-
-        static void Install()
-        {
-            EditorApplication.delayCall -= Install;
-
-            SceneView.AddOverlayToActiveView(new LevelDesignOverlay());
-            EditorPrefs.SetBool(InstalledKey, true);
+            Handles.EndGUI();
         }
     }
 }
