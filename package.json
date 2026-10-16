@@ -1,0 +1,22 @@
+{
+  "name": "com.zhongxiaguchen.terrain2d",
+  "version": "0.1.0",
+  "displayName": "Terrain 2D",
+  "description": "Editable 2D ground for Unity. An equal-spacing height field with a per-X height query, four independently editable edges (top / bottom / left / right), runtime destruction, seeded procedural generation, and automatic mesh + collider generation. Aimed at platformers that need destructible or procedurally generated terrain.",
+  "unity": "2022.3",
+  "keywords": [
+    "2d",
+    "terrain",
+    "ground",
+    "destructible",
+    "procedural",
+    "platformer",
+    "heightmap",
+    "level-design"
+  ],
+  "author": {
+    "name": "zhongxiaguchen"
+  },
+  "license": "MIT",
+  "dependencies": {}
+}
