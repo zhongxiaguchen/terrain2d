@@ -89,6 +89,19 @@ namespace Terrain2D
                 {
                     name = "Terrain2D (" + shader.name + ")"
                 };
+
+                // 必须 mark dirty，否则编辑器里现造的这份材质**不会被保存**。
+                //
+                // 后果有两个，第二个是致命的：
+                //   1. 每次加载场景 / 打开 prefab 都重新造一份材质 —— 材质泄漏；
+                //   2. 材质没存进场景，着色器引用也就不在场景里。打包时这个着色器
+                //      可能被剥离（它只被运行时的 Shader.Find 用到，构建管线看不见），
+                //      地形到玩家机器上就渲染成粉红色。
+                //
+                // 存下来之后，着色器引用随场景一起进构建，问题从根上消失。
+#if UNITY_EDITOR
+                if (!Application.isPlaying) UnityEditor.EditorUtility.SetDirty(renderer);
+#endif
                 return;
             }
 
