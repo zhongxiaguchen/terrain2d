@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Sorting order field in the terrain viewport toolbar**: a new row with an order
   field for the terrain itself, so the draw order can be changed without going to the
   Inspector.
+- **Sorting order for any 2D object**: a small toolbar pinned to the bottom of the Scene
+  view whenever the selection contains renderers, showing just the sorting order (and
+  handling multi-selection, including mixed values). It steps aside while a
+  `HeightmapTerrain2D` is selected, because the terrain editor draws its own toolbar in
+  the same spot.
 
 ### Notes
 
