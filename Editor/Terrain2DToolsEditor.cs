@@ -139,17 +139,6 @@ namespace Terrain2D.EditorTools
             return SessionState.GetBool(EditKey(terrain.GetInstanceID()), true);
         }
 
-        /// <summary>
-        /// 从外部设置某个地形的编辑模式开关。
-        /// 「关卡设计模式」的「选中地形」按钮用它 —— 用户可能手动关过编辑模式，
-        /// 光选中物体并不会把工具栏叫回来。
-        /// </summary>
-        public static void SetEditing(HeightmapTerrain2D terrain, bool editing)
-        {
-            if (terrain == null) return;
-            SessionState.SetBool(EditKey(terrain.GetInstanceID()), editing);
-        }
-
         public override void OnInspectorGUI()
         {
             var terrain = (HeightmapTerrain2D)target;
@@ -349,9 +338,6 @@ namespace Terrain2D.EditorTools
 
         void OnSceneGUI()
         {
-            // 关卡设计模式关掉时，视口里不留任何东西 —— 手柄、工具栏全部收起。
-            if (!LevelDesignMode.Enabled) return;
-
             var terrain = (HeightmapTerrain2D)target;
 
             int count = terrain.sampleCount;
