@@ -32,6 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   handling multi-selection, including mixed values). It steps aside while a
   `HeightmapTerrain2D` is selected, because the terrain editor draws its own toolbar in
   the same spot.
+- **Level design mode**: an `IMGUIOverlay` docked to the Scene view's top toolbar
+  (`DockZone.TopToolbar`) with a toggle that hides every overlay this package draws, so
+  the viewport can be cleared for checking art, screenshots, or recording. A 选中地形
+  button beside it selects the terrain in the scene and puts it into edit mode. The state
+  lives in `EditorPrefs` and defaults to on, so installing the package changes nothing
+  until you opt out. The overlay itself is never hidden — otherwise there would be no way
+  to switch it back on.
 
 ### Notes
 
