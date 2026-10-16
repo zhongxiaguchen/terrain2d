@@ -92,7 +92,9 @@ namespace Terrain2D.EditorTools
                 RebuildSelection();
             }
 
-            return Selected.Count > 0;
+            // 模式开关在这里判、而不是在 RebuildSelection 里：切换模式不会改变选中对象，
+            // 缓存不会失效，所以必须每次查一次。
+            return LevelDesignMode.Enabled && Selected.Count > 0;
         }
 
         static void RebuildSelection()
