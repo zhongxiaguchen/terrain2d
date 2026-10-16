@@ -115,6 +115,9 @@ namespace Terrain2D
         // 每次用之前 Clear()，所以不会把上一个渲染器的覆盖值带过来。
         static readonly MaterialPropertyBlock ColorBlock = new MaterialPropertyBlock();
 
+        // 已经为"材质没有颜色属性"警告过的材质实例，避免每次重建都刷屏。
+        static readonly HashSet<int> WarnedMaterials = new HashSet<int>();
+
         /// <summary>
         /// 把颜色应用到**这一个**渲染器上。
         ///
@@ -147,6 +150,19 @@ namespace Terrain2D
                 ColorBlock.SetColor(propertyId, color);
                 renderer.SetPropertyBlock(ColorBlock);
                 return;
+            }
+
+            // 材质上三个颜色属性一个都没有 —— 颜色工具对它完全无效，而且**不会报错**。
+            // 用户手动指定了一个不带颜色的材质时就是这个情况，光看现象只会觉得"改了没反应"。
+            // 每个材质只警告一次，免得拖动时每帧刷屏。
+            if (!WarnedMaterials.Contains(material.GetInstanceID()))
+            {
+                WarnedMaterials.Add(material.GetInstanceID());
+                Debug.LogWarning(
+                    "Terrain 2D：材质 \"" + material.name + "\" 上没有 _Color / _BaseColor / " +
+                    "_TintColor 任何一个属性，颜色工具对它无效。换一个精灵着色器，" +
+                    "或者把材质槽留空让组件自动生成。",
+                    renderer);
             }
         }
 
