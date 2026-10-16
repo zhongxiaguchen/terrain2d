@@ -49,6 +49,13 @@ namespace Terrain2D.EditorTools
         // per frame is pure garbage.
         static GUIStyle _rowLabel;
 
+        /// <summary>Opens the window. Also called from the terrain toolbar.</summary>
+        public static void Open()
+        {
+            var window = GetWindow<SortingOrderWindow>("2D Sorting");
+            window.minSize = new Vector2(470f, 320f);
+        }
+
         // Registered in three places on purpose: "Window" is where people look for windows,
         // "Tools" is the usual home for editor tools, and the GameObject submenu is where
         // this package's other entries live.
@@ -57,21 +64,15 @@ namespace Terrain2D.EditorTools
         // not documented as AllowMultiple, and guessing at editor API surface is how this
         // file got its first round of compile errors.
         [MenuItem("Window/2D Sorting Manager")]
-        static void OpenFromWindowMenu() { OpenWindow(); }
+        static void OpenFromWindowMenu() { Open(); }
 
         [MenuItem("Tools/2D Sorting Manager")]
-        static void OpenFromToolsMenu() { OpenWindow(); }
+        static void OpenFromToolsMenu() { Open(); }
 
         // The submenu name has to stay Chinese to land next to the package's existing
         // entries; it gets renamed along with the rest of the code base.
         [MenuItem("GameObject/地形 2D/2D Sorting Manager", false, 12)]
-        static void OpenFromGameObjectMenu() { OpenWindow(); }
-
-        static void OpenWindow()
-        {
-            var window = GetWindow<SortingOrderWindow>("2D Sorting");
-            window.minSize = new Vector2(470f, 320f);
-        }
+        static void OpenFromGameObjectMenu() { Open(); }
 
         void OnEnable()
         {

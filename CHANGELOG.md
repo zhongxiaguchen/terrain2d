@@ -24,11 +24,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Scene view toolbar pinned to the bottom of the viewport (collapsible), with
   live point counts, colour picker, and batch operations.
 - `Triangulator`: ear-clipping triangulation that tolerates collinear vertices.
-- `Tools ▸ 2D Sorting Manager`: a scene-wide window that lists every renderer in draw
-  order (front-most at the top), supports drag-to-reorder, and writes the result back as
-  a clean `0, 1, 2 …` run of `sortingOrder` values per sorting layer. Also flags the
+- **2D sorting manager**: a scene-wide window that lists every renderer in draw order
+  (front-most at the top), supports drag-to-reorder, and writes the result back as a
+  clean `0, 1, 2 …` run of `sortingOrder` values per sorting layer. Also flags the
   renderers whose relative order is undefined because they share layer / order / Z.
   It only touches sorting layer and order — Z is never modified.
+  Reachable from `Window ▸ 2D Sorting Manager`, `Tools ▸ 2D Sorting Manager`, and
+  `GameObject ▸ 地形 2D ▸ 2D Sorting Manager`.
+- **Sorting controls in the terrain viewport toolbar**: a new row with a sorting-layer
+  dropdown and an order field for the terrain itself, plus a button that opens the
+  scene-wide sorting manager.
 
 ### Notes
 

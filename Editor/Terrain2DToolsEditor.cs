@@ -95,6 +95,35 @@ namespace Terrain2D.EditorTools
 
         static readonly int DragControlId = "Terrain2D.DragPoint".GetHashCode();
 
+        // 排序层名字缓存。
+        // SortingLayer.layers 每次访问都会分配一个新数组，而视口工具栏是每帧重绘的，
+        // 所以缓存起来。用户新加了排序层时，靠 OnEnable（切换选中物体 / 域重载）刷新。
+        static string[] _sortingLayerNames;
+
+        void OnEnable()
+        {
+            _sortingLayerNames = null;
+        }
+
+        static string[] SortingLayerNames()
+        {
+            if (_sortingLayerNames == null || _sortingLayerNames.Length == 0)
+            {
+                var layers = SortingLayer.layers;
+                _sortingLayerNames = new string[layers.Length];
+                for (int i = 0; i < layers.Length; i++) _sortingLayerNames[i] = layers[i].name;
+            }
+            return _sortingLayerNames;
+        }
+
+        static int IndexOfSortingLayer(string name)
+        {
+            string[] names = SortingLayerNames();
+            for (int i = 0; i < names.Length; i++)
+                if (names[i] == name) return i;
+            return 0;
+        }
+
         // ---- 拖动状态 ----
         // 不用 Handles.Slider：它既负责渲染又负责算偏移，在"每帧重建网格"的场景下
         // 反馈不稳定。这里自己管 hotControl，用 HandleUtility.CalcLineTranslation
@@ -780,7 +809,55 @@ namespace Terrain2D.EditorTools
 
             if (open)
             {
-                // ---- 第二行：操作按钮（和 Inspector 里那排一样）----
+                // ---- 第二行：渲染层级（作用于本地形）----
+                // 这一行改的是**本地形自己**的层级。整个场景所有 2D 对象的绘制顺序，
+                // 用右边的「层级管理器」—— 它会把排序顺序写成一串干净的 0,1,2…
+                GUILayout.BeginHorizontal();
+
+                GUILayout.Label("层级", EditorStyles.miniLabel);
+
+                string[] layerNames = SortingLayerNames();
+                int layerIndex = IndexOfSortingLayer(terrain.sortingLayerName);
+
+                // 只用最基础的 Popup / IntField 重载（不带 GUIStyle）：
+                // 这个文件以前没画过这两个控件，不拿没验证过的重载去赌编译。
+                int pickedLayer = EditorGUILayout.Popup(layerIndex, layerNames, GUILayout.Width(104f));
+
+                if (pickedLayer != layerIndex && pickedLayer >= 0 && pickedLayer < layerNames.Length)
+                {
+                    Undo.RecordObject(terrain, "改地形排序层");
+                    terrain.sortingLayerName = layerNames[pickedLayer];
+                    terrain.ApplyVisuals();
+                    EditorUtility.SetDirty(terrain);
+                    SceneView.RepaintAll();
+                }
+
+                GUILayout.Label("顺序", EditorStyles.miniLabel);
+
+                EditorGUI.BeginChangeCheck();
+                int sortingOrder = EditorGUILayout.IntField(terrain.sortingOrder, GUILayout.Width(48f));
+
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(terrain, "改地形排序顺序");
+                    terrain.sortingOrder = sortingOrder;
+                    terrain.ApplyVisuals();
+                    EditorUtility.SetDirty(terrain);
+                    SceneView.RepaintAll();
+                }
+
+                GUILayout.Space(10f);
+
+                if (GUILayout.Button("层级管理器", EditorStyles.miniButton, GUILayout.Width(84f)))
+                    SortingOrderWindow.Open();
+
+                GUILayout.FlexibleSpace();
+
+                GUILayout.Label("整场景所有 2D 对象的绘制顺序 →「层级管理器」", EditorStyles.miniLabel);
+
+                GUILayout.EndHorizontal();
+
+                // ---- 第三行：操作按钮（和 Inspector 里那排一样）----
                 GUILayout.BeginHorizontal();
 
                 if (GUILayout.Button("生成", EditorStyles.miniButton, GUILayout.Width(46f)))
@@ -810,7 +887,7 @@ namespace Terrain2D.EditorTools
 
                 GUILayout.EndHorizontal();
 
-                // ---- 第三行：颜色图例 + 操作说明 ----
+                // ---- 第四行：颜色图例 + 操作说明 ----
                 GUILayout.BeginHorizontal();
 
                 Chip(TopColor, "地表");
