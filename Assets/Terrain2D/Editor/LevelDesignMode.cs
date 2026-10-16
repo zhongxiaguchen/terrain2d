@@ -63,9 +63,11 @@ namespace Terrain2D.EditorTools
     ///
     /// The Scene view toolbar is built from overlays (Unity 2021.2+), and IMGUIOverlay lets this
     /// one be written with plain GUILayout instead of UI Toolkit. defaultDockZone puts it in the
-    /// toolbar strip at the top without the user having to drag it there.
+    /// toolbar strip at the top; defaultDisplay is what makes it appear there at all — without
+    /// it the overlay is created but stays hidden.
     /// </summary>
-    [Overlay(typeof(SceneView), OverlayId, DisplayName, defaultDockZone = DockZone.TopToolbar)]
+    [Overlay(typeof(SceneView), OverlayId, DisplayName,
+             defaultDisplay = true, defaultDockZone = DockZone.TopToolbar)]
     internal class LevelDesignOverlay : IMGUIOverlay
     {
         const string OverlayId = "Terrain2D/Level Design";
@@ -84,6 +86,37 @@ namespace Terrain2D.EditorTools
                 LevelDesignMode.FocusTerrain();
 
             GUILayout.EndHorizontal();
+        }
+    }
+
+    /// <summary>
+    /// Puts the overlay into the Scene view the first time this package is loaded.
+    ///
+    /// defaultDisplay only applies the first time an overlay is created, and Unity has usually
+    /// already recorded a layout for it by then — so relying on the attribute alone leaves the
+    /// button invisible with no hint that it exists. AddOverlayToActiveView puts it in the last
+    /// focused Scene view and keeps it there.
+    ///
+    /// Runs once, guarded by an EditorPrefs flag: after that the user's own layout wins, so
+    /// hiding the overlay sticks instead of being undone on every domain reload.
+    /// </summary>
+    [InitializeOnLoad]
+    internal static class LevelDesignOverlayInstaller
+    {
+        const string InstalledKey = "Terrain2D.LevelDesignOverlayInstalled";
+
+        static LevelDesignOverlayInstaller()
+        {
+            if (EditorPrefs.GetBool(InstalledKey, false)) return;
+            EditorApplication.delayCall += Install;
+        }
+
+        static void Install()
+        {
+            EditorApplication.delayCall -= Install;
+
+            SceneView.AddOverlayToActiveView(new LevelDesignOverlay());
+            EditorPrefs.SetBool(InstalledKey, true);
         }
     }
 }
