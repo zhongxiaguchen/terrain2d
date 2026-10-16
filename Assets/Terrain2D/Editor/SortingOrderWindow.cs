@@ -5,6 +5,7 @@ using UnityEditor.SceneManagement;
 using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Tilemaps;
 
 namespace Terrain2D.EditorTools
 {
@@ -209,7 +210,10 @@ namespace Terrain2D.EditorTools
 
         void OnGUI()
         {
-            if (_dirty && (_list == null || !_list.dragging)) Rebuild();
+            // Rescan when the hierarchy changed. A hierarchy change never happens while a
+            // row is being dragged (dragging only writes sortingOrder), so it is safe to
+            // rebuild unconditionally here.
+            if (_dirty) Rebuild();
 
             DrawToolbar();
 
@@ -372,8 +376,9 @@ namespace Terrain2D.EditorTools
 
         Color LayerColor(int layerId)
         {
+            // Color.HSVToRGB, not EditorGUIUtility.HSVToRGB — the latter is obsolete.
             float hue = Mathf.Repeat(0.13f * LayerIndex(layerId), 1f);
-            return EditorGUIUtility.HSVToRGB(hue, 0.5f, 0.85f);
+            return Color.HSVToRGB(hue, 0.5f, 0.85f);
         }
 
         static void MarkDirty(Renderer r)
