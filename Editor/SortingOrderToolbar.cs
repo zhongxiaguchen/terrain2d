@@ -68,6 +68,20 @@ namespace Terrain2D.EditorTools
 
             if (EditorGUI.EndChangeCheck()) ApplyOrder(order);
 
+            if (HasColorControl())
+            {
+                GUILayout.Space(12f);
+                GUILayout.Label("颜色", EditorStyles.miniLabel);
+
+                EditorGUI.BeginChangeCheck();
+                EditorGUI.showMixedValue = HasMixedColor();
+                Color color = EditorGUILayout.ColorField(
+                    GUIContent.none, GetColor(Selected[0]), true, true, false, GUILayout.Width(52f));
+                EditorGUI.showMixedValue = false;
+
+                if (EditorGUI.EndChangeCheck()) ApplyColor(color);
+            }
+
             GUILayout.FlexibleSpace();
 
             GUILayout.Label(
@@ -142,6 +156,91 @@ namespace Terrain2D.EditorTools
             }
 
             SceneView.RepaintAll();
+        }
+
+        // ------------------------------------------------------------------ 颜色
+        //
+        // 颜色存在哪，取决于物体是什么：
+        //   本包自己的网格（PolygonMesh2D / HeightmapTerrain2D）→ 组件上的 color 字段，
+        //       改完调 ApplyVisuals() 刷到渲染器上；
+        //   SpriteRenderer → Unity 自己的 color 属性，直接改，Inspector 里会同步显示；
+        //   其他渲染器 → 不动。没有可靠的"每物体一份"的写法，与其乱猜不如不显示。
+
+        static bool HasColorControl()
+        {
+            for (int i = 0; i < Selected.Count; i++)
+                if (SupportsColor(Selected[i])) return true;
+            return false;
+        }
+
+        static bool SupportsColor(Renderer renderer)
+        {
+            return renderer is SpriteRenderer
+                || renderer.GetComponent<PolygonMesh2D>() != null
+                || renderer.GetComponent<HeightmapTerrain2D>() != null;
+        }
+
+        static Color GetColor(Renderer renderer)
+        {
+            var terrain = renderer.GetComponent<HeightmapTerrain2D>();
+            if (terrain != null) return terrain.color;
+
+            var polygon = renderer.GetComponent<PolygonMesh2D>();
+            if (polygon != null) return polygon.color;
+
+            var sprite = renderer as SpriteRenderer;
+            if (sprite != null) return sprite.color;
+
+            return Color.white;
+        }
+
+        static void ApplyColor(Color color)
+        {
+            for (int i = 0; i < Selected.Count; i++)
+            {
+                var renderer = Selected[i];
+
+                var terrain = renderer.GetComponent<HeightmapTerrain2D>();
+                if (terrain != null)
+                {
+                    Undo.RecordObject(terrain, "改颜色");
+                    terrain.color = color;
+                    terrain.ApplyVisuals();
+                    EditorUtility.SetDirty(terrain);
+                    continue;
+                }
+
+                var polygon = renderer.GetComponent<PolygonMesh2D>();
+                if (polygon != null)
+                {
+                    Undo.RecordObject(polygon, "改颜色");
+                    polygon.color = color;
+                    polygon.ApplyVisuals();
+                    EditorUtility.SetDirty(polygon);
+                    continue;
+                }
+
+                var sprite = renderer as SpriteRenderer;
+                if (sprite != null)
+                {
+                    Undo.RecordObject(sprite, "改颜色");
+                    sprite.color = color;
+                    EditorUtility.SetDirty(sprite);
+                }
+            }
+
+            SceneView.RepaintAll();
+        }
+
+        static bool HasMixedColor()
+        {
+            if (Selected.Count < 2) return false;
+
+            Color first = GetColor(Selected[0]);
+            for (int i = 1; i < Selected.Count; i++)
+                if (GetColor(Selected[i]) != first) return true;
+
+            return false;
         }
     }
 }

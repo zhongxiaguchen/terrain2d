@@ -32,6 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   handling multi-selection, including mixed values). It steps aside while a
   `HeightmapTerrain2D` is selected, because the terrain editor draws its own toolbar in
   the same spot.
+- **Colour for any 2D object**: the same toolbar also carries a colour field. Where the
+  colour lives depends on the object — `PolygonMesh2D` and `HeightmapTerrain2D` keep it on
+  the component (and are told to refresh), a `SpriteRenderer` uses Unity's own `color`
+  property so the Inspector stays in sync, and anything else is left alone rather than
+  guessed at.
 
 ### Notes
 
