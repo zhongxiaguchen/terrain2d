@@ -21,6 +21,10 @@ namespace Terrain2D.EditorTools
     internal static class SortingOrderToolbar
     {
         static readonly List<Renderer> Selected = new List<Renderer>();
+
+        // 选中物体上的碰撞体，随选择一起重建 —— 工具栏每帧都要读，别每帧 GetComponent。
+        static readonly List<Collider2D> Colliders = new List<Collider2D>();
+
         static bool _dirty = true;
 
         // Tracked separately from Selected.Count: "nothing selected" and "selected, but the
@@ -159,6 +163,20 @@ namespace Terrain2D.EditorTools
                     ColorPalette.ShowMenu(GetColor(Selected[0]), ApplyColor);
             }
 
+            // 碰撞体开关：给背景装饰关掉碰撞，不用去 Inspector 里翻。
+            // 没有碰撞体时置灰而不是藏起来 —— 藏起来会让人以为这个功能没做。
+            GUILayout.Space(12f);
+
+            using (new EditorGUI.DisabledScope(Colliders.Count == 0))
+            {
+                bool allOn = AllCollidersEnabled();
+                bool nowOn = GUILayout.Toggle(
+                    allOn, "碰撞体", EditorStyles.miniButton, GUILayout.Width(64f));
+
+                // 多选且状态不一致时 allOn 为 false，点一下就是"全开"。
+                if (Colliders.Count > 0 && nowOn != allOn) ApplyColliders(nowOn);
+            }
+
             GUILayout.FlexibleSpace();
 
             GUILayout.Label(
@@ -189,6 +207,7 @@ namespace Terrain2D.EditorTools
         static void RebuildSelection()
         {
             Selected.Clear();
+            Colliders.Clear();
 
             GameObject[] objects = Selection.gameObjects;
             _selectionEmpty = objects == null || objects.Length == 0;
@@ -204,8 +223,14 @@ namespace Terrain2D.EditorTools
             for (int i = 0; i < objects.Length; i++)
             {
                 if (objects[i] == null) continue;
+
                 var renderer = objects[i].GetComponent<Renderer>();
-                if (renderer != null && renderer.enabled) Selected.Add(renderer);
+                if (renderer == null || !renderer.enabled) continue;
+
+                Selected.Add(renderer);
+
+                var collider = objects[i].GetComponent<Collider2D>();
+                if (collider != null) Colliders.Add(collider);
             }
         }
 
@@ -263,6 +288,32 @@ namespace Terrain2D.EditorTools
                 position.z = depth;
                 transform.position = position;
                 EditorUtility.SetDirty(transform);
+            }
+
+            SceneView.RepaintAll();
+        }
+
+        static bool AllCollidersEnabled()
+        {
+            if (Colliders.Count == 0) return false;
+
+            for (int i = 0; i < Colliders.Count; i++)
+                if (!Colliders[i].enabled) return false;
+
+            return true;
+        }
+
+        static void ApplyColliders(bool enabled)
+        {
+            var objects = new UnityEngine.Object[Colliders.Count];
+            for (int i = 0; i < Colliders.Count; i++) objects[i] = Colliders[i];
+
+            Undo.RecordObjects(objects, enabled ? "启用碰撞体" : "关闭碰撞体");
+
+            for (int i = 0; i < Colliders.Count; i++)
+            {
+                Colliders[i].enabled = enabled;
+                EditorUtility.SetDirty(Colliders[i]);
             }
 
             SceneView.RepaintAll();
