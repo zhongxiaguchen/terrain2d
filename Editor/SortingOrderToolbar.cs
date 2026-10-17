@@ -27,6 +27,9 @@ namespace Terrain2D.EditorTools
         // object has no renderer" want different behaviour.
         static bool _selectionEmpty = true;
 
+        // Must match the [MenuItem] path in Terrain2DToolsEditor exactly.
+        const string CreateTerrainMenu = "GameObject/地形 2D/创建高度场地形";
+
         static SortingOrderToolbar()
         {
             SceneView.duringSceneGui -= OnSceneGui;
@@ -79,7 +82,13 @@ namespace Terrain2D.EditorTools
             GUILayout.Label("关卡设计", EditorStyles.miniBoldLabel);
 
             if (GUILayout.Button("创建高度场地形", EditorStyles.miniButton, GUILayout.Width(112f)))
-                HeightmapTerrain2DEditor.CreateTerrain(null);
+            {
+                // 走菜单路径而不是直接调 HeightmapTerrain2DEditor.CreateTerrain()：
+                // 后者让两个文件产生编译期依赖，而 Unity 的增量编译不止一次出现
+                // "先编译、后导入"，于是报 'does not contain a definition'。
+                // 字符串调用没有这个问题。
+                EditorApplication.ExecuteMenuItem(CreateTerrainMenu);
+            }
 
             GUILayout.FlexibleSpace();
 
