@@ -1,487 +1,203 @@
-# Unity 2D 不规则地形 · 三条路线
+# Terrain 2D
 
-配套代码。针对"想要一个像 PolygonCollider2D 那样能直接拖边缘的地形组件"这个需求。
+Editable 2D ground for Unity. Draw a surface, sculpt it by dragging points, and get a mesh,
+a collider, and a **cheap height query** out of it.
 
-**所在项目**：OrisLevel（Unity 2022.3.53f1 · URP 14 · 2D Renderer）
-
-```
-Assets/Terrain2D/
-├── Scripts/
-│   ├── Triangulator.cs          耳切三角化（简单多边形）
-│   ├── MeshUtil.cs              Mesh 组装工具（法线/切线/材质）
-│   ├── PolygonMesh2D.cs         ★ 轮廓 → Mesh，轮廓来自 PolygonCollider2D
-│   └── HeightmapTerrain2D.cs    ★ 高度数组 → Mesh + 碰撞体，程序化/可破坏 + Scene 视图雕刻
-└── Editor/
-    └── Terrain2DToolsEditor.cs  Inspector 按钮、Scene 视图手柄、菜单项
-```
-
-依赖：`com.unity.feature.2d`（已装，含 Sprite Shape 9.0.5 / Tilemap Extras 3.1.3）、
-`com.unity.modules.physics2d`。没有额外的第三方依赖。
-
-**快速上手**：菜单栏 `GameObject → 地形 2D → 创建高度场地形` 直接生成一块地形。
-另一个菜单项 `GameObject → 地形 2D → 为选中的碰撞体添加多边形网格` 给已有的
-`PolygonCollider2D` 补上渲染。
-
-**Inspector 字段标题、悬停提示、按钮、菜单全部是中文的。**
-
-字段标题的中文写在 `Editor/InspectorL10n.cs` 配合各编辑器里；
-悬停提示直接反射读取组件字段上的 `[Tooltip]`，所以文案只有一份，改一处即可。
+Built for platformers that need terrain they can *ask questions about* and *blow holes in*.
 
 ---
 
-## 改颜色
+## Why this, and not Sprite Shape or a tilemap
 
-两个组件都有独立的「外观」分组，直接改 **颜色** 字段即可，不用去动材质：
-
-| 字段 | 说明 |
-|---|---|
-| 颜色 | 只作用于**当前这个物体**，改完立刻生效 |
-| 应用颜色 | 关掉后不再自动刷颜色，完全手动控制 |
-| 排序层 | 2D 排序层，默认 `Default` |
-| 排序顺序 | 数值越大越靠前（越靠镜头） |
-| UV 缩放 | 平面 UV 映射比例 |
-| 翻转绕序 | 材质开了背面剔除导致看不见时打开 |
-
-> **为什么改一个颜色不会影响其他物体？**
->
-> 颜色走的是 `MaterialPropertyBlock`（逐渲染器的覆盖值），**不是**写进 Material 对象。
->
-> 早先的写法是 `renderer.sharedMaterial.SetColor(...)` —— 那是写材质本身。
-> 而 `EnsureMaterial` 自动挂的是"内嵌材质"（不是项目里的材质资产），
-> 复制物体、或者同一个 prefab 的多个实例，会指向**同一个 Material 对象** ——
-> 于是改一个颜色，所有共用它的物体一起变。
->
-> 换成 MaterialPropertyBlock 之后：不碰材质对象、不实例化新材质，天生每个物体一份。
-> 颜色本身存在组件的 `color` 字段里（会序列化），每次 `OnEnable` / 重建都会重刷一遍，
-> 所以不依赖 block 自己被保存。
->
-> 代价：带 MaterialPropertyBlock 的渲染器会跳出 SRP Batcher。地形物体数量不多，
-> 可以忽略。
-
----
-
-## 路线 A：Sprite Shape（官方内置，不需要任何脚本）
-
-**这就是你要的"能拖边缘的地形组件"。**
-
-1. `Create → 2D → Sprite Shape Profile`，类型选 **Open**。
-2. Profile 里配 Sprite 列表和 **Angle Range**（哪个图负责平地、斜坡、陡坡）。
-3. 把 Profile 拖进场景 → 生成带 `Sprite Shape Controller` 的物体。
-4. 在 Controller 上点 **Edit Spline**，控制点就出来了。拖动 = 改地形边缘。
-   - 选中点按 **M** 切换 Linear / Mirrored / Non-Mirrored
-   - 点曲线中间可以加点，按 **Del** 删点
-   - 按住拖动出曲线，Linear 模式出硬角
-5. **加碰撞体**：给同一个物体加 `Polygon Collider 2D` 或 `Edge Collider 2D`，
-   Controller 上会多出一个 **Collider** 折叠区：
-
-| 属性 | 作用 |
-|---|---|
-| Update Collider | 默认开。地形一改，碰撞体自动跟着更新 |
-| Offset | -0.5 ~ 0.5。把碰撞边缘从视觉边缘推出去/收进来 |
-| Optimize Collider | 默认开。自动清理共线的多余点 |
-| Detail | 碰撞体的细分质量 |
-
-关键点：**`Update Collider` 打开时，你手改的碰撞体顶点会被覆盖**。
-想手动微调碰撞形状，就把 `Update Collider` 和 `Optimize Collider` 都关掉。
-
-> 细节：Sprite Shape 的渲染 Mesh 是内部生成的，没有公开 API。碰撞体走的是上面这套机制，
-> 所以不需要写脚本，也别去尝试读它的 mesh。
-
----
-
-## 路线 B：PolygonMesh2D（任意多边形，四条边都能加点）
-
-`PolygonCollider2D` 就是那个"可以自定义边缘"的组件，只是它不负责渲染。
-`PolygonMesh2D` 补上渲染这一半：**读碰撞体的 path → 三角化 → 生成 Mesh**。
-
-**需要左右边也能加点编辑、需要斜边、需要隧道/洞穴 —— 就用这条路线。**
-它是自由多边形，没有"哪条边不能编辑"的限制。
-
-工作流：
-
-1. 建一个空物体，加 `Polygon Collider 2D`。
-2. 加 `PolygonMesh2D`（`MeshFilter` / `MeshRenderer` 会自动补上）。
-3. 选中 `Polygon Collider 2D`，点 **Edit Collider** 进入编辑状态。
-4. 在 Scene 视图里操作：
-
-| 操作 | 效果 |
-|---|---|
-| 拖动锚点 | 移动顶点 |
-| **Shift + 点边线** | 在该处**插入一个顶点** |
-| **Ctrl / Cmd + 点锚点** | **删除**该顶点（至少保留 3 个） |
-
-5. 改完立刻看到填充好的地形。`实时更新` 默认开，靠比对顶点哈希来触发重建，开销很小。
-
-> **锚点加不上？** 检查物体的 Scale。Unity 的碰撞体编辑器在 Scale 过大时会失效，
-> 这是已知问题，把 Scale 设成 1 就好。
-
-**和路线 C 的分工**
-
-| | HeightmapTerrain2D | PolygonMesh2D |
-|---|---|---|
-| 形状 | 地表 + 底部两条曲线（带子） | 任意闭合多边形 |
-| 左右边 | 只能是直线（可用青色手柄拖成斜线） | 任意曲线，可加点 |
-| 洞 / 隧道 | 不支持 | 支持（keyhole 画法） |
-| 噪声生成 | 支持 | 不支持 |
-| 可破坏 | 支持（改数组） | 不支持 |
-| 编辑方式 | 本工具自带编辑模式 | Unity 的 Edit Collider |
-
-**要点**
-
-- 碰撞体的每一条 path 会变成一个独立的填充区域，彼此是"岛"不是"洞"。
-- 要挖洞，用 **keyhole** 画法：从外轮廓切一条很窄的缝进去，绕洞一圈再缝回来，
-  这样整体仍是一个简单多边形。见 `Triangulator` 注释。
-- 顶点顺序（顺/逆时针）不用管，内部会归一化。
-- 没指定材质时自动挂 URP 2D 着色器（`Sprite-Lit-Default` → `Sprite-Unlit-Default` → `Sprites/Default` 依次尝试）。
-  渲染反面了就把「翻转绕序」打开。
-
-**Inspector 参数（中文）**
-
-| 参数 | 说明 |
-|---|---|
-| 轮廓来源 | 「多边形碰撞体 2D」或「本地顶点列表」 |
-| 轮廓 | 读哪个碰撞体，留空则找自己身上的 |
-| 颜色 / 应用颜色 | 见上面「改颜色」 |
-| 排序层 / 排序顺序 | 2D 图层排序 |
-| UV 缩放 | 平面 UV，`localX × uvScale` |
-| Z 偏移 | 网格的 Z 偏移，用来分层 |
-| 翻转绕序 | 材质开了背面剔除时用 |
-| 实时更新 | 轮廓变化时自动重建 |
-
-**API**
+Sprite Shape and tilemaps describe a **shape**. This describes a **function**: for any X,
+what is the ground height?
 
 ```csharp
-var mesh = GetComponent<PolygonMesh2D>();
-mesh.Rebuild();                          // 手动重建
-var paths = mesh.ReadPaths();            // 读当前轮廓（局部坐标）
+float y = terrain.SampleHeight(x);   // no collider, no raycast, no Play mode
 ```
 
----
+That single property is what makes everything else cheap:
 
-## 路线 C：HeightmapTerrain2D（不规则地形 / 程序化 / 可破坏）
+| | Height field (this) | Spline / path | Collider raycast |
+|---|---|---|---|
+| Ground height at X | binary search over an array | solve the curve for X | `Physics2D.Raycast` |
+| Usable in the editor, outside Play mode | yes | yes | no |
+| Needs a collider to exist first | no | no | yes |
+| Scattering 500 props on the ground | 500 array lookups | 500 curve solves | 500 physics queries |
+| Saving / syncing / undoing the terrain | it is a `float[]` | control points move | — |
 
-地形是**一条闭合折线围成的实体**，四条边都能加点：
-
-```
-地表曲线（左→右） → 右边链 → 底部曲线（右→左） → 左边链
-```
-
-- `Heights[]` = 地表高度
-- `BottomHeights[]` = 底部轮廓（关闭「底部独立轮廓」时退化成一条平直线）
-- `LeftEdge` / `RightEdge` = 左右两条边上的控制点（默认空 = 直线）
-
-网格和碰撞体都从这条闭合折线派生。因为地表是"X 的函数"，挖洞只是改数组里的数字。
-
-**不能做的**：地形中间挖洞（隧道、洞穴）—— 单条闭合折线表达不了"环"。
-那种需求用 `PolygonMesh2D`。
-
-**Inspector 参数（中文，按分组排列）**
-
-| 分组 / 参数 | 建议值 |
-|---|---|
-| **形状** · 采样点数量 | 128 ~ 512 |
-| **形状** · 采样间距 | 0.25（世界单位/采样） |
-| **形状** · 起始 X | 0 |
-| **形状** · 底部独立轮廓 | 做不规则地形时打开 |
-| **形状** · 底部 Y | 底部平直时的高度（开启独立轮廓后只作初始值） |
-| **形状** · 底部左/右端点水平偏移 | 拖成斜边用（开启独立轮廓后才显示） |
-| **程序化生成** · 随机种子 | 固定种子 = 可复现 |
-| **程序化生成** · 起伏幅度 | 3 |
-| **程序化生成** · 噪声频率 | 0.02 ~ 0.1（越小山越宽） |
-| **程序化生成** · 叠加层数 | 4 |
-| **程序化生成** · 幅度衰减 | 0.5 |
-| **程序化生成** · 平滑遍数 | 2（0 = 原始噪声） |
-| **外观** · 颜色 | 见上面「改颜色」 |
-| **碰撞** · 生成多边形碰撞体 | 底部不规则时**必须打开** |
-| **碰撞** · 碰撞体采样间隔 | 1（只有地形极长时才调大） |
-
-**编辑模式（相当于 PolygonCollider2D 的 Edit Collider）**
-
-Inspector 底部有 **「进入编辑模式」** 按钮，点一下进入（再点退出）。
-编辑模式在 Scene 视图里的操作：
-
-| 操作 | 效果 |
-|---|---|
-| 拖**蓝色**圆点 | 改**地表点**（自由 2D：上下改高度，左右改水平偏移） |
-| 拖**紫色**圆点 | 改**底部点**（自由 2D，需要打开「底部独立轮廓」） |
-| 拖**橙色**圆点 | 改**左 / 右边**上的控制点（自由 2D） |
-| **Shift + 点任意一条边** | 在该处**插入一个控制点**（四条边都行） |
-| **Ctrl / Cmd + 点圆点** | **删除**该控制点 |
-| 拖**绿色方块**（左右边中点） | **移动左 / 右边界**，对侧固定不动 |
-| 拖**青色方块**（底部左右角外侧） | **把左 / 右边拖成斜线**（需要打开底部轮廓） |
-| 拖**橙色方块**（底边中点） | 改**底边整体高度**（关闭底部轮廓时才有） |
-
-**所有圆点都是自由 2D 拖动**：横向移动会记进该点自己的水平偏移里，只影响它自己。
-
-采样点的 X = `originX + 下标 × spacing + 该点的水平偏移`。默认偏移全是 0，也就是均匀分布。
-横向拖歪了想重来，点工具栏的「**清空横向**」。
-
-进入编辑模式后：
-- Scene 视图会画出**完整闭合轮廓**（地表亮橙 + 底部紫色，四条边都在里面）
-- 显示**全部**采样点（不再受「控制点间隔」限制），控制点缩小一号避免挡住
-- **视口底部有一条横排工具栏**（仿 Unity 粒子特效那个）：左边是折叠箭头 ▾，
-  右边实时显示计数（地表 / 左 / 右各几个点），中间是颜色图例和操作说明
-- 按住 Ctrl 时圆点变红，表示进入删除态（此时不显示边界方块，免得误抓）
-
-**底部工具栏（三行，可折叠）**
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│ ▾  地形编辑工具   颜色[■]  [边界方块] [平滑拖动]   地表 29　左 0　右 2 │
-│ [生成][拍平][重建]  [细分×2][简化一半][清空左右边][清空横向]         │
-│ ■地表 ■底部轮廓 ■左右边   ■移边界 ■边变斜 ■底边整体   Shift+点边=加点 │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
-| 行 | 内容 |
-|---|---|
-| 第 1 行 | 折叠箭头 ▾ / ▸、颜色选择器、边界方块开关、**平滑拖动开关**、实时计数 |
-| 第 2 行 | 七个操作按钮，和 Inspector 里那排完全一致 |
-| 第 3 行 | 颜色图例 + 操作说明 |
-
-- **折叠箭头**点一下收起，只剩第 1 行，不挡视线（状态会记住）
-- **颜色**：直接在视口里改，不用切到 Inspector
-- **边界方块**：绿/青/橙方块的总开关，专心拖点时关掉
-- **平滑拖动**：默认关（点独立）；打开后拖一个点会带动左右邻居
-- **计数** `地表 29　左 0　右 2` —— 排查问题时最有用的一行
-
-所有按钮都走 `Undo.RecordObject`，Ctrl+Z 能撤销。
-
-轮廓自交时，**警告框会出现在工具栏正上方**（红字），不用切到 Inspector 就能看到。
-
-**地形轮廓是一条闭合折线**
-
-```
-地表（左→右） → 右边链（上→下） → 底部（右→左） → 左边链（下→上）
-```
-
-四条边都是折线，都可以加点。默认左右两条链和底边折线都是空的：
-
-- 左右链空 = 竖直直线
-- 底边折线空 = 用 `bottomY` 那条平直线（或开了「底部独立轮廓」之后的逐点数据）
-
-**加点是分边独立的** —— Shift+点哪条边就加在哪条边上，别的边不动。
-底边有自己的折线（`BottomEdge`），所以往底边加点**不会碰地表**。
-
-- **没加过边控制点（含底边）、也没横向拖过点** → 走三角带三角化，又快又稳
-- **加过边控制点，或有过横向偏移** → 改走耳切三角化，支持任意轮廓
-
-> **轮廓自交会怎样？** 控制点拖过头让轮廓自己交叉时，耳切解不出来，网格会停止更新，
-> Inspector 会弹红色提示。把点往回收一点就恢复 —— 这是有意的，比留一个破面好排查。
-
-**做不规则地形（浮空岛 / 悬岩 / 天花板）**
-
-1. 打开「**底部独立轮廓**」——底部会初始化成一条平直线（高度 = 底部 Y）
-2. 进编辑模式，拖紫色圆点把底边塑形
-3. 底边想要更细的点：**Shift + 点底边** —— 走独立的底边折线，地表完全不受影响
-4. 左右边想要更自由的形状：Shift + 点左右边加点，拖橙色圆点做外凸或内凹的岩壁
-
-> 需要**地形中间挖洞**（隧道、洞穴）仍然要用 `PolygonMesh2D` ——
-> 单条闭合折线表达不了"环"这种拓扑。
-
-**为什么拖动不用 `Handles.Slider`**
-
-`Handles.Slider` 既负责渲染手柄又负责计算偏移量，在"每帧重建网格"的场景下反馈不稳定
-（拖动会跟不上鼠标）。现在改成自己管 `hotControl`，用
-`HandleUtility.CalcLineTranslation` 把鼠标位移直接投影到拖动轴上，
-得到**相对抓取点的绝对偏移** —— 不累积、不自激，而且手柄能实时跟着鼠标走。
-
-两个批量按钮（只在编辑模式下显示）：
-
-- **细分 ×2** —— 每两点之间插一个新点，点数变成 2n−1
-- **简化一半** —— 隔一个取一个，点数约减半
-
-**加点原理**：地形是等距高度场，所以"加点"就是细分——点数变了，
-但 `spacing` 会跟着重算，**地形总宽度保持不变**。新点高度取左右邻居平均，轮廓不会跳。
-这样 `SampleHeight`、挖坑、碰撞体全都不用改。两端点不能删，它们决定地形范围。
-
-**平时（非编辑模式）**
-
-| 参数 | 说明 |
-|---|---|
-| 显示控制点 | 平时是否显示稀疏控制点，默认开 |
-| 控制点间隔 | 每隔 N 个采样放一个点，默认 8。128 采样 → 16 个点 |
-| **平滑拖动** | **默认关**。关着时每个点只影响自己；打开后拖一个点会带动左右邻居 |
-| 平滑影响范围 | 只在「平滑拖动」打开时生效，带动左右各 N 个邻居，默认 3 |
-| 显示边界方块 | 绿/青/橙那几个方块的总开关。专心拖控制点时关掉，免得碍事 |
-
-**默认每个点独立**：拖一个点只改它自己的高度，不碰别的点。
-想要"拖一个点周围跟着平滑起伏"的手感，才打开「平滑拖动」。
-
-**两条拾取规则（避免方块挡住点）**
-
-1. **控制点永远优先于方块。** 鼠标同时靠近一个点和一
-   个方块时，选中的一定是点。方块只是辅助手柄。
-2. **方块的位置跟着点走。** 绿色方块放在左右边折线的**实际中点**上
-   （沿长度取中点），所以给边加点、拖动之后方块会跟着移动，不会飘到形状内部。
-
-一次拖动只产生一步 Undo，Ctrl+Z 能整段撤销。编辑模式会记住，切换选中物体再回来还在。
-
-**碰撞体选择**
-
-- 「生成边缘碰撞体」**默认开，用这个**。沿地表的一条开链，最省，站立/行走够用。
-- 「生成多边形碰撞体」默认关。需要从下方或侧面撞到地形时才开。
-- 「边缘厚度」：给边缘一点厚度（比如 0.02），防止高速物体穿透。
-- 两个都开会有双份碰撞开销，别同时开。
-
-**API**
+Destruction falls out of the same structure — a crater is just "lower the heights in this
+range":
 
 ```csharp
-var terrain = GetComponent<HeightmapTerrain2D>();
-
-terrain.Generate();                       // 按当前参数用噪声生成
-terrain.Flatten();                        // 拍平
-terrain.DestroyCircle(localPos, 2.5f);    // 炸出一个坑
-terrain.RaiseCircle(localPos, 1.5f);      // 堆一坨土
-terrain.SampleHeight(localX);             // 插值取地表高度
-terrain.SampleWorldPoint(localX);         // 世界坐标地表点
-
-terrain.InsertSample(10);                 // 在索引 10 处插入一个采样点
-terrain.RemoveSample(10);                 // 删除索引 10 的采样点
-terrain.Subdivide();                      // 整体细分，点数 → 2n-1
-terrain.Simplify();                       // 整体简化，点数约减半
-
-float[] h = terrain.Heights;              // 直接改数组
-h[10] = 5f;
-terrain.Rebuild();                        // 改完重建
+terrain.DestroyCircle(hitPoint, 1.5f);   // local space
+terrain.RaiseCircle(hitPoint, 1.0f);
 ```
 
-`Heights` 是序列化的，所以编辑器里生成好的地形在进入 Play 模式后还在。
-
-**挖坑原理**：地形是地表线以下的实心区域。爆炸圆在该列的圆底高度若低于当前地表，
-就把地表压到圆底 —— 也就是"地表只降不升"，正好是弹坑的形状。
-
----
-
-## 性能清单
-
-- 别给每个 Tile 挂 Collider。Tilemap 用 `TilemapCollider2D` + `CompositeCollider2D`，
-  并勾上 `Used By Composite`，几百个格子会合并成几个多边形。
-- 地表用 `EdgeCollider2D`，不要用 `PolygonCollider2D` 做长条地面。
-- 碰撞体顶点数要控住。不规则轮廓先做抽稀（`colliderStride` 或 Douglas-Peucker）。
-- 角色卡在接缝上：`CompositeCollider2D` + 胶囊碰撞体 + 调 `Contact Offset`。
-- 重建 Mesh 是 CPU 操作，别每帧对大地形调用。改数据后重建一次即可。
+**What it costs.** The walkable surface is single-valued in X, so the *surface* cannot
+overhang. The other three edges are free-form polylines, so you still get caves, rock
+formations and irregular bottoms — just not an overhanging floor.
 
 ---
 
-## 选型
+## Requirements
 
-| 需求 | 方案 |
+| | |
 |---|---|
-| 平滑起伏、手绘轮廓、要好看 | Sprite Shape（路线 A） |
-| **地形中间要挖洞（隧道 / 洞穴）** | **PolygonMesh2D（路线 B）** |
-| 随机生成、固定种子、可破坏 | HeightmapTerrain2D（路线 C） |
-| 大块地形、平台、悬崖，四条边都要能加点 | HeightmapTerrain2D（路线 C） |
+| Unity | **2022.3** or newer (developed and tested on 2022.3.53f1) |
+| URP + 2D Renderer | **tested** (URP 14) |
+| Built-in Render Pipeline | falls back to `Sprites/Default`; **not tested** |
+| HDRP | not supported |
 
-两条路线的边界很清楚：**需要"环"这种拓扑（洞）→ B；其余都用 C。**
-C 的四条边都能加点、能拖成任意形状，比 B 多出噪声生成和可破坏两个能力。
+## Install
 
----
+Package Manager → `+` → *Add package from git URL…*
 
-## 排障：Scene 视图底部那条工具栏不见了
+```
+https://github.com/zhongxiaguchen/terrain2d.git
+```
 
-**先别怀疑文件丢了。** 工具栏由 `HeightmapTerrain2DEditor.OnSceneGUI()` 画，
-只有两个条件同时成立才出现：
+> The editor UI is currently in Chinese. An English pass over the UI strings is planned;
+> the code, comments and commit history are already in English.
 
-1. 场景里**选中了一个挂 `HeightmapTerrain2D` 的物体**；
-2. 这个物体处于**编辑模式**。
+## Quick start
 
-第 2 条的开关存在 `SessionState` 里 —— 那是**纯内存**的，Unity 一重启就清空，
-而 key 还绑在 `instanceID` 上（重启后 instanceID 也会变）。所以
-"电脑崩了、重开 Unity，工具栏就没了"几乎总是这个开关回落造成的，不是脚本被删。
+1. Create one from **GameObject ▸ 地形 2D ▸ 创建高度场地形**.
+2. Select it — the editing toolbar appears at the bottom of the Scene view.
+3. Drag the dots to sculpt.
 
-默认值已改成 **开**（`IsEditing` 里的 `SessionState.GetBool(..., true)`），
-重启后选中地形物体就能直接看到工具栏。
-
-### 恢复步骤
-
-| 症状 | 处理 |
+| Action | |
 |---|---|
-| 场景里根本没有地形物体 | 菜单 `GameObject ▸ 地形 2D ▸ 创建高度场地形` |
-| 有物体但工具栏不显示 | 选中它，Inspector 里点「进入编辑模式」 |
-| 物体上显示 `Missing (Mono Script)` | 脚本 GUID 对不上，见下 |
+| Drag a dot | move that point (2D — horizontally as well as vertically) |
+| `Shift` + click an edge | insert a point on that edge |
+| `Ctrl` / `Cmd` + click a dot | remove that point |
+| Collapse the toolbar | the `▸` arrow on the left of it |
 
-### 如果物体显示 Missing (Mono Script)
+The toolbar also carries the terrain's sorting order and colour, plus one-click
+`Subdivide ×2`, `Simplify`, `Flatten`, `Rebuild` and `Clear`.
 
-场景里记的是脚本 GUID，脚本文件被删或 `.meta` 被重新生成，引用就断了。当前 GUID：
+## The runtime API
 
-| 文件 | guid |
+This is the part that a shape-editing tool cannot give you.
+
+```csharp
+using Terrain2D;
+
+public class Spawner : MonoBehaviour
+{
+    public HeightmapTerrain2D terrain;
+    public GameObject tree;
+
+    void Start()
+    {
+        // 200 trees, snapped to the ground. No raycasts, no colliders involved.
+        for (int i = 0; i < 200; i++)
+        {
+            float x = Random.Range(0f, 40f);
+            Vector2 world = terrain.SampleWorldPoint(x);
+            Instantiate(tree, world, Quaternion.identity);
+        }
+    }
+
+    public void Explode(Vector2 worldPoint)
+    {
+        // Convert to the terrain's local space, then carve.
+        Vector2 local = terrain.transform.InverseTransformPoint(worldPoint);
+        terrain.DestroyCircle(local, 1.5f);
+    }
+}
+```
+
+| Method | |
 |---|---|
-| `Scripts/HeightmapTerrain2D.cs.meta` | `611f7509e735cf245ac346d37347e200` |
-| `Scripts/PolygonMesh2D.cs.meta` | `14e601de5bd66804cafb4f793c449231` |
-| `Editor/Terrain2DToolsEditor.cs.meta` | `1c32c5ef3e55b9e4cadafbd865bda989` |
+| `float SampleHeight(float localX)` | interpolated surface height at a local X |
+| `Vector2 SampleWorldPoint(float localX)` | the same point in world space |
+| `void DestroyCircle(Vector2 localCenter, float radius)` | carve a crater |
+| `void RaiseCircle(Vector2 localCenter, float radius)` | pile terrain up |
+| `void Generate()` | rebuild the heights from `seed` and the noise settings |
+| `void Flatten()` | reset to `baseHeight` |
+| `void Subdivide()` / `void Simplify()` | double / halve the sample count |
+| `void Rebuild()` | regenerate the mesh and colliders |
 
-`.meta` 和 `.cs` 必须成对存在。只拷 `.cs` 不拷 `.meta`，Unity 会生成新 GUID，
-原来场景里的引用就全断了。
+`SampleHeight` uses a binary search over the sample positions, so it stays correct after
+points have been dragged sideways — the samples do not have to be evenly spaced.
 
-### 崩溃后找回没保存的场景改动
+## Editing the edges
 
-**基本找不回来，别指望。** Unity 2022.2+ 在 `Preferences ▸ General ▸ Auto Save`
-有个自动保存开关，但它对场景改动的可靠性很差；整机断电 / 蓝屏 / 强杀进程
-也不会生成 `Temp/__Backupscenes/`（那个只在 Unity 自己捕获异常退出时才有）。
+The outline is a closed polyline with four sides, and **each side has its own point list**:
 
-实测过一次崩溃：项目里既没有 `Temp/__Backupscenes/`，也没有 `Temp/Autosave/`，
-场景文件停在崩溃前最后一次手动保存的状态 —— 崩溃前新建但没保存的物体全部丢失。
+```
+surface (left → right) → right chain (top → bottom) → bottom (right → left) → left chain
+```
 
-**保险做法**：把项目放进 Git（`Library/`、`Temp/` 写进 `.gitignore`），
-或者至少养成改完就 Ctrl+S 的习惯。编辑器脚本改坏了也能靠 Git 一键回退。
+Adding a point to one edge never touches the others. That matters most for the bottom: it
+has its own independent polyline, so sculpting the underside of a floating island leaves
+the walkable surface exactly as it was.
 
----
+## Colliders
 
-## 四条边怎么加点
+Two colliders, both generated from the same outline as the mesh:
 
-四条边的命中判定都走 `FindNearestSegment`，但**加点存在哪不一样**：
-
-| 边 | 加点存在哪 | 会不会动到别的边 |
+| Setting | Default | |
 |---|---|---|
-| 地表 | 采样数组（`InsertSample`） | — 就是它自己 |
-| 右边 | `RightEdge` 独立折线 | 不会 |
-| 左边 | `LeftEdge` 独立折线 | 不会 |
-| **底边** | `BottomEdge` 独立折线 | **不会** |
+| `buildColliders` | on | master switch |
+| `buildEdgeCollider` | **on** | one open chain along the surface. Cheap, and the right choice for a platformer's one-way ground |
+| `buildPolygonCollider` | off | the full closed outline. Turn it on when you need to collide from below or from the side — a floating island, for instance |
 
-Shift+点哪条边，点就加在哪条边上，其他边一概不动。
+Note that turning a collider off disables the component rather than deleting it.
 
-### 底边为什么需要一条独立折线
+## The other component: PolygonMesh2D
 
-以前地表和底部**共用同一套采样下标**（`_heights[i]` 和 `_bottomHeights[i]` 用的是同一个 `i`），
-所以往底边加点只能走 `InsertSample`，结果就是：
+For anything that is not a height field — a cave, an arbitrary outline with holes. It reads
+a `PolygonCollider2D` and renders it as a mesh, so you edit the shape with Unity's own
+**Edit Collider** and the mesh follows.
 
-1. 地表凭空多出一个点；
-2. `spacing` 重算（总宽保持不变 → 每段间距变小），**地表所有点的 X 跟着挪位**，
-   形状整体变形。
+Note the direction is reversed compared to `HeightmapTerrain2D`: this component *reads* a
+collider, it does not create one.
 
-用户看到的就是"我点底边，上面也跟着变了"。
+## Field reference
 
-现在底边有自己的折线 `BottomEdge`（本地坐标，**右 -> 左，含两个角点**）：
+### Shape
 
-- **空** = 老行为：用 `bottomY` 那条平直线，或开了「底部独立轮廓」之后的逐点数据；
-- **有点** = 它就是底边的全部，渲染（`BuildOutline`）和碰撞（`BuildColliders`）都从它走。
+| Field | Default | |
+|---|---|---|
+| `sampleCount` | 128 | number of samples across the surface |
+| `spacing` | 0.25 | distance between samples |
+| `originX` | 0 | local X of the first sample |
+| `useBottomProfile` | off | per-sample bottom editing |
+| `bottomY` | -12 | flat bottom height when the profile is off |
 
-**第一次点底边时**会先用当前底边把折线种下来（`SeedBottomEdgeIfEmpty`），形状零变化，
-然后才插点。所以 `sampleCount` / `spacing` / `originX` / `_heights` / `_topOffsetsX`
-**一个都不动**，底边只是多了一个点，可以立刻拖它塑形。
+### Procedural generation
 
-一次 Ctrl+Z 撤销。
+| Field | Default | |
+|---|---|---|
+| `seed` | 12345 | same seed, same terrain |
+| `baseHeight` | 0 | |
+| `amplitude` | 3 | |
+| `frequency` | 0.06 | lower = wider hills |
+| `octaves` | 4 | |
+| `persistence` | 0.5 | |
+| `lacunarity` | 2 | |
+| `smoothPasses` | 2 | |
 
-> `HasStraightSides` 在有底边折线时返回 false，网格自动从三角带切到耳切。
-> 这是必须的：三角带按"地表点与底部点逐点对齐"铺，折线的点数和地表脱钩后铺不了。
+### Appearance
 
-### 三条曾经"看得见、点不中"的边（已修）
+| Field | Default | |
+|---|---|---|
+| `color` | white | applied per renderer, so duplicating an object does not change its neighbours |
+| `sortingLayerName` / `sortingOrder` | `Default` / 0 | |
+| `uvScale` | 0.5 | planar UV mapping |
+| `flipWinding` | off | turn on if backface culling hides the terrain |
 
-| 边 | 曾经的问题 |
-|---|---|
-| **底部** | `if (bottom == null) continue;` —— 没开「底部独立轮廓」时整条底边被跳过，Shift+点击毫无反应 |
-| **左边** | 判定用的折线拿 `originX` 当左上角，画出来的却是 `TopXAt(0)`。**横拖过最左侧地表点之后**两者差一个 `TopOffsetX(0)`（实测 2.5 单位 ≈ 60px，远超 14px 命中半径），这条边就"看得见、点不中" |
-| 右边 | 一直正常 —— 它用的是 `TopXAt(last)`，本来就带偏移 |
+## Known limitations
 
-排查这类问题先看两个值：Inspector 里的 `_topOffsetsX[0]` 是不是 0、
-「底部独立轮廓」开没开。
+- The surface cannot overhang (see above).
+- Only URP 14 has been tested. Built-in RP should work through the `Sprites/Default`
+  fallback, but that path has not been run.
+- The editor UI is still in Chinese.
 
-### 其他操作
+## License
 
-| 你的目的 | 怎么做 |
-|---|---|
-| 底边整体上下移 | 用橙色方块（「底边整体」），不用加点 |
-| 底边加点塑形 | Shift+点底边 → 拖紫色点 |
-| 删底边上的点 | Ctrl / Cmd + 点紫色点 |
-| 所有边恢复成直线 | Inspector / 工具栏的「**清空边加点**」 |
+MIT — see [LICENSE.md](LICENSE.md).
+
+中文文档见 [README.zh-CN.md](README.zh-CN.md)。
