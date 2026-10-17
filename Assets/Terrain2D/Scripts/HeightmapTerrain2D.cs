@@ -903,6 +903,29 @@ namespace Terrain2D
         }
 
         /// <summary>
+        /// 一键开关碰撞。
+        ///
+        /// 关掉时**不能只把 buildColliders 设成 false** —— 那样只是让 Rebuild() 跳过
+        /// BuildColliders()，已经挂在物体上的碰撞体仍然生效，用户看到的就是
+        /// "取消了勾选但碰撞还在"。所以这里连已有的碰撞体一起禁用。
+        ///
+        /// 打开时反过来：重新生成，BuildColliders() 会把它们重新启用。
+        /// </summary>
+        public void SetCollisionEnabled(bool enabled)
+        {
+            buildColliders = enabled;
+
+            if (enabled)
+            {
+                Rebuild();
+                return;
+            }
+
+            var colliders = GetComponents<Collider2D>();
+            for (int i = 0; i < colliders.Length; i++) colliders[i].enabled = false;
+        }
+
+        /// <summary>
         /// 轮廓三角化是否成功。左边/右边加过控制点后会走耳切；如果轮廓自交，
         /// 耳切会失败（网格消失），这时这个值是 false，Inspector 会给出提示。
         /// </summary>
