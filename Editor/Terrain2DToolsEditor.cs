@@ -1388,8 +1388,34 @@ namespace Terrain2D.EditorTools
             var terrain = go.AddComponent<HeightmapTerrain2D>();
             terrain.Generate();
 
+            // 只在没有父物体时摆到视口中心。从 Hierarchy 右键「创建为子物体」进来时
+            // parent 不为空，那种情况下用户期望它就在父物体那儿，不能传送走。
+            if (parent == null) PlaceAtViewCenter(go, terrain);
+
             Selection.activeGameObject = go;
             return terrain;
+        }
+
+        /// <summary>
+        /// 放到当前 Scene 视图的正中，而不是原点 —— 否则点完「创建」还得自己去找它。
+        ///
+        /// 注意不能直接把 transform 摆到 pivot：地形的局部 X 是从 0 到
+        /// (sampleCount-1)*spacing，左边缘在 0。直接对齐会让**左边缘**落在视口中心，
+        /// 看上去偏右半个身位。所以左移半个宽度，让它在视口里真正居中。
+        /// Y 同理，用 baseHeight 对齐 —— 地表是绕着 baseHeight 起伏的。
+        /// </summary>
+        static void PlaceAtViewCenter(GameObject go, HeightmapTerrain2D terrain)
+        {
+            var view = SceneView.lastActiveSceneView;
+            if (view == null) return;
+
+            Vector3 pivot = view.pivot;
+            float width = Mathf.Max(0f, (terrain.sampleCount - 1) * terrain.spacing);
+
+            go.transform.position = new Vector3(
+                pivot.x - width * 0.5f,
+                pivot.y - terrain.baseHeight,
+                0f);
         }
     }
 }
