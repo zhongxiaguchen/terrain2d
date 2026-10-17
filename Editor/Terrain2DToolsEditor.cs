@@ -830,6 +830,20 @@ namespace Terrain2D.EditorTools
                     SceneView.RepaintAll();
                 }
 
+                // 和「任意 2D 物体」那条工具栏用同一套 Z 预设。
+                if (GUILayout.Button("▾", EditorStyles.miniButton, GUILayout.Width(20f)))
+                {
+                    DepthPresets.ShowMenu(terrain.transform.position.z, chosen =>
+                    {
+                        Undo.RecordObject(terrain.transform, "改地形 Z");
+                        Vector3 position = terrain.transform.position;
+                        position.z = chosen;
+                        terrain.transform.position = position;
+                        EditorUtility.SetDirty(terrain.transform);
+                        SceneView.RepaintAll();
+                    });
+                }
+
                 GUILayout.FlexibleSpace();
 
                 GUILayout.Label("层级大的盖在上面　Z 小的靠前", EditorStyles.miniLabel);

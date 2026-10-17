@@ -107,56 +107,13 @@ namespace Terrain2D.EditorTools
 
             menu.AddSeparator(string.Empty);
             menu.AddItem(new GUIContent("保存当前颜色…"), false,
-                () => ColorPaletteSaveWindow.Show(current, onPick));
+                () => NameDialog.Show("保存颜色", name =>
+                {
+                    ColorPalette.Add(name, current);
+                    onPick(current);
+                }));
 
             menu.ShowAsContext();
-        }
-    }
-
-    /// <summary>Small modal for naming a colour before it goes into the palette.</summary>
-    internal class ColorPaletteSaveWindow : EditorWindow
-    {
-        string _name = string.Empty;
-        Color _color = Color.white;
-        Action<Color> _onSaved;
-
-        public static void Show(Color color, Action<Color> onSaved)
-        {
-            var window = CreateInstance<ColorPaletteSaveWindow>();
-            window.titleContent = new GUIContent("保存颜色");
-            window._color = color;
-            window._onSaved = onSaved;
-            window.minSize = new Vector2(280f, 104f);
-            window.maxSize = new Vector2(280f, 104f);
-            window.ShowUtility();
-            window.Focus();
-        }
-
-        void OnGUI()
-        {
-            EditorGUILayout.Space(8f);
-
-            _color = EditorGUILayout.ColorField("颜色", _color);
-            _name = EditorGUILayout.TextField("名称", _name);
-
-            EditorGUILayout.Space(8f);
-
-            GUILayout.BeginHorizontal();
-            GUILayout.FlexibleSpace();
-
-            if (GUILayout.Button("取消", GUILayout.Width(64f))) Close();
-
-            using (new EditorGUI.DisabledScope(string.IsNullOrEmpty(_name.Trim())))
-            {
-                if (GUILayout.Button("保存", GUILayout.Width(64f)))
-                {
-                    ColorPalette.Add(_name, _color);
-                    if (_onSaved != null) _onSaved(_color);
-                    Close();
-                }
-            }
-
-            GUILayout.EndHorizontal();
         }
     }
 }

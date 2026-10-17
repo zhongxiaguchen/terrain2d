@@ -136,6 +136,10 @@ namespace Terrain2D.EditorTools
 
             if (EditorGUI.EndChangeCheck()) ApplyZ(depth);
 
+            // 命名保存的 Z（背景 / 地面 / 前景…），省得记数字。
+            if (GUILayout.Button("▾", EditorStyles.miniButton, GUILayout.Width(20f)))
+                DepthPresets.ShowMenu(Selected[0].transform.position.z, ApplyZ);
+
             if (HasColorControl())
             {
                 GUILayout.Space(12f);
