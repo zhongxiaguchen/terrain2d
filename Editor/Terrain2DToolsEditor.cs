@@ -844,9 +844,30 @@ namespace Terrain2D.EditorTools
                     });
                 }
 
+                // 碰撞体总开关。和「任意 2D 物体」那条工具栏语义对齐：
+                // 取消勾选 = 不再自动生成 + 已有碰撞体全部禁用。
+                GUILayout.Space(12f);
+
+                bool collision = GUILayout.Toggle(
+                    terrain.buildColliders, "碰撞体", EditorStyles.miniButton, GUILayout.Width(64f));
+
+                if (collision != terrain.buildColliders)
+                {
+                    // 碰撞体的 enabled 也要能撤销，所以地形和它的碰撞体一起记录。
+                    var colliders = terrain.GetComponents<Collider2D>();
+                    var targets = new UnityEngine.Object[colliders.Length + 1];
+                    targets[0] = terrain;
+                    for (int i = 0; i < colliders.Length; i++) targets[i + 1] = colliders[i];
+
+                    Undo.RecordObjects(targets, collision ? "启用地形碰撞" : "关闭地形碰撞");
+                    terrain.SetCollisionEnabled(collision);
+                    EditorUtility.SetDirty(terrain);
+                    SceneView.RepaintAll();
+                }
+
                 GUILayout.FlexibleSpace();
 
-                GUILayout.Label("层级大的盖在上面　Z 小的靠前", EditorStyles.miniLabel);
+                GUILayout.Label("层级大的盖上面　Z 小的靠前", EditorStyles.miniLabel);
 
                 GUILayout.EndHorizontal();
 
