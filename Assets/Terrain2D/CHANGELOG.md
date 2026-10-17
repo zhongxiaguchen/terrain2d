@@ -42,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   beside the order. Written to world Z, because that is what the camera actually sorts
   by, which is what "put this in front" means. This is the groundwork for
   foreground / background layers.
+- **Named Z presets**: the `▾` beside the Z field saves and recalls named depths —
+  background / ground / foreground without remembering the numbers. Each entry shows its
+  value next to the name, because a Z number means nothing on its own. Stored in
+  `EditorPrefs` alongside the colour palette.
 - **Empty-selection toolbar**: with nothing selected, a small toolbar offers
   创建高度场地形, so starting a level does not mean hunting through the GameObject menu.
   A selection that has no renderer on it stays quiet instead.
