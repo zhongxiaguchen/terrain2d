@@ -811,9 +811,28 @@ namespace Terrain2D.EditorTools
                     SceneView.RepaintAll();
                 }
 
+                // Z：前景 / 背景分层用。层级相同时 Unity 就是靠 Z 决定谁在前，
+                // 所以它和 sortingOrder 是一套东西的两半。
+                GUILayout.Space(10f);
+                GUILayout.Label("Z", EditorStyles.miniLabel);
+
+                EditorGUI.BeginChangeCheck();
+                float depth = EditorGUILayout.FloatField(
+                    terrain.transform.position.z, GUILayout.Width(56f));
+
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(terrain.transform, "改地形 Z");
+                    Vector3 position = terrain.transform.position;
+                    position.z = depth;
+                    terrain.transform.position = position;
+                    EditorUtility.SetDirty(terrain.transform);
+                    SceneView.RepaintAll();
+                }
+
                 GUILayout.FlexibleSpace();
 
-                GUILayout.Label("绘制顺序，数字大的盖在上面", EditorStyles.miniLabel);
+                GUILayout.Label("层级大的盖在上面　Z 小的靠前", EditorStyles.miniLabel);
 
                 GUILayout.EndHorizontal();
 
