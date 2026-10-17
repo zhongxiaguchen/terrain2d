@@ -23,6 +23,10 @@ namespace Terrain2D.EditorTools
         static readonly List<Renderer> Selected = new List<Renderer>();
         static bool _dirty = true;
 
+        // Tracked separately from Selected.Count: "nothing selected" and "selected, but the
+        // object has no renderer" want different behaviour.
+        static bool _selectionEmpty = true;
+
         static SortingOrderToolbar()
         {
             SceneView.duringSceneGui -= OnSceneGui;
@@ -43,13 +47,55 @@ namespace Terrain2D.EditorTools
             if (view == null) return;
             if (Event.current == null) return;
 
-            if (!CollectSelection()) return;
+            if (!CollectSelection())
+            {
+                // Nothing selected at all: offer the one thing you always need first.
+                // A selection that merely has no renderer on it stays quiet — a "create a
+                // terrain" prompt there would just be noise.
+                if (_selectionEmpty) DrawStartToolbar(view);
+                return;
+            }
 
+            DrawSelectionToolbar(view);
+        }
+
+        /// <summary>Shown when the selection is empty.</summary>
+        static void DrawStartToolbar(SceneView view)
+        {
             Rect viewRect = view.position;
 
-            // Same trick as the terrain toolbar: cover the viewport with a transparent area and
-            // push the content to the bottom with FlexibleSpace, so there is no need to know
-            // how tall the Scene view toolbar is.
+            // Same trick as everywhere else here: cover the viewport with a transparent area
+            // and push the content to the bottom with FlexibleSpace, so there is no need to
+            // know how tall the Scene view toolbar is.
+            float areaHeight = Mathf.Max(60f, viewRect.height - 32f);
+
+            Handles.BeginGUI();
+            GUILayout.BeginArea(new Rect(8f, 0f, viewRect.width - 16f, areaHeight));
+            GUILayout.FlexibleSpace();
+
+            GUILayout.BeginVertical("box");
+            GUILayout.BeginHorizontal();
+
+            GUILayout.Label("关卡设计", EditorStyles.miniBoldLabel);
+
+            if (GUILayout.Button("创建高度场地形", EditorStyles.miniButton, GUILayout.Width(112f)))
+                HeightmapTerrain2DEditor.CreateTerrain(null);
+
+            GUILayout.FlexibleSpace();
+
+            GUILayout.Label("选中物体后这里会显示层级和颜色", EditorStyles.miniLabel);
+
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+
+            GUILayout.EndArea();
+            Handles.EndGUI();
+        }
+
+        static void DrawSelectionToolbar(SceneView view)
+        {
+            Rect viewRect = view.position;
+
             float areaHeight = Mathf.Max(60f, viewRect.height - 32f);
 
             Handles.BeginGUI();
@@ -80,6 +126,11 @@ namespace Terrain2D.EditorTools
                 EditorGUI.showMixedValue = false;
 
                 if (EditorGUI.EndChangeCheck()) ApplyColor(color);
+
+                // Saved colours. The picker itself cannot hold names, so this is where a
+                // palette lives.
+                if (GUILayout.Button("▾", EditorStyles.miniButton, GUILayout.Width(20f)))
+                    ColorPalette.ShowMenu(GetColor(Selected[0]), ApplyColor);
             }
 
             GUILayout.FlexibleSpace();
@@ -114,7 +165,8 @@ namespace Terrain2D.EditorTools
             Selected.Clear();
 
             GameObject[] objects = Selection.gameObjects;
-            if (objects == null || objects.Length == 0) return;
+            _selectionEmpty = objects == null || objects.Length == 0;
+            if (_selectionEmpty) return;
 
             // A selected terrain owns the bottom of the viewport; stand down.
             for (int i = 0; i < objects.Length; i++)

@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the component (and are told to refresh), a `SpriteRenderer` uses Unity's own `color`
   property so the Inspector stays in sync, and anything else is left alone rather than
   guessed at.
+- **Empty-selection toolbar**: with nothing selected, a small toolbar offers
+  创建高度场地形, so starting a level does not mean hunting through the GameObject menu.
+  A selection that has no renderer on it stays quiet instead.
+- **Named colour palette**: the `▾` beside any colour field lists saved colours and can
+  save the current one under a name. Kept in `EditorPrefs`, so it belongs to the user
+  rather than to the project — a deliberate trade, since a swatch list in the project
+  folder would show up in version control and merge badly.
 
 ### Notes
 
