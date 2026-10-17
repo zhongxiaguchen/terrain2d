@@ -743,6 +743,19 @@ namespace Terrain2D.EditorTools
                     Repaint();
                 }
 
+                // 和「任意 2D 物体」那条工具栏用同一个调色板。
+                if (GUILayout.Button("▾", EditorStyles.miniButton, GUILayout.Width(20f)))
+                {
+                    ColorPalette.ShowMenu(terrain.color, chosen =>
+                    {
+                        Undo.RecordObject(terrain, "改地形颜色");
+                        terrain.color = chosen;
+                        terrain.ApplyVisuals();
+                        EditorUtility.SetDirty(terrain);
+                        SceneView.RepaintAll();
+                    });
+                }
+
                 bool boundary = GUILayout.Toggle(
                     terrain.showBoundaryHandles, "边界方块",
                     EditorStyles.miniButton, GUILayout.Width(68f));
@@ -1357,8 +1370,17 @@ namespace Terrain2D.EditorTools
         [MenuItem("GameObject/地形 2D/创建高度场地形", false, 11)]
         static void CreateHeightmapTerrain(MenuCommand command)
         {
+            CreateTerrain(command.context as GameObject);
+        }
+
+        /// <summary>
+        /// 创建一块高度场地形。parent 为父物体，可以是 null。
+        /// 菜单项和视口工具栏的「创建高度场地形」按钮都走这里 —— 后者没有 MenuCommand 可用。
+        /// </summary>
+        public static HeightmapTerrain2D CreateTerrain(GameObject parent)
+        {
             var go = new GameObject("高度场地形");
-            GameObjectUtility.SetParentAndAlign(go, command.context as GameObject);
+            GameObjectUtility.SetParentAndAlign(go, parent);
             Undo.RegisterCreatedObjectUndo(go, "创建高度场地形");
 
             go.AddComponent<MeshFilter>();
@@ -1367,6 +1389,7 @@ namespace Terrain2D.EditorTools
             terrain.Generate();
 
             Selection.activeGameObject = go;
+            return terrain;
         }
     }
 }
