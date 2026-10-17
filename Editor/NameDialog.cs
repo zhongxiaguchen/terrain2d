@@ -13,6 +13,9 @@ namespace Terrain2D.EditorTools
     /// </summary>
     internal class NameDialog : EditorWindow
     {
+        const float Width = 300f;
+        const float Height = 88f;
+
         string _name = string.Empty;
         Action<string> _onAccept;
 
@@ -21,9 +24,19 @@ namespace Terrain2D.EditorTools
             var window = CreateInstance<NameDialog>();
             window.titleContent = new GUIContent(title);
             window._onAccept = onAccept;
-            window.minSize = new Vector2(300f, 88f);
-            window.maxSize = new Vector2(300f, 88f);
+            window.minSize = new Vector2(Width, Height);
+            window.maxSize = new Vector2(Width, Height);
+
             window.ShowUtility();
+
+            // 必须显式定位。CreateInstance + ShowUtility 不给位置的话，窗口可能落在屏幕外，
+            // 表现和"点了没反应"一模一样 —— 这条踩过。居中到主编辑器窗口。
+            Rect main = EditorGUIUtility.GetMainWindowPosition();
+            window.position = new Rect(
+                main.center.x - Width * 0.5f,
+                main.center.y - Height * 0.5f,
+                Width, Height);
+
             window.Focus();
         }
 
