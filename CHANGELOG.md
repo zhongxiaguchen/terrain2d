@@ -46,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   background / ground / foreground without remembering the numbers. Each entry shows its
   value next to the name, because a Z number means nothing on its own. Stored in
   `EditorPrefs` alongside the colour palette.
+- **Collider toggle**: a checkbox in the any-2D-object toolbar that enables or disables the
+  selected objects' `Collider2D`, so background decoration stops blocking the player without
+  a trip to the Inspector. Greyed out rather than hidden when there is no collider — a
+  missing control looks like a missing feature.
 - **Empty-selection toolbar**: with nothing selected, a small toolbar offers
   创建高度场地形, so starting a level does not mean hunting through the GameObject menu.
   A selection that has no renderer on it stays quiet instead.
