@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the component (and are told to refresh), a `SpriteRenderer` uses Unity's own `color`
   property so the Inspector stays in sync, and anything else is left alone rather than
   guessed at.
+- **Z field next to the sorting order**: sorting order and Z are two halves of the same
+  thing — when orders tie, Unity falls back to Z — so both toolbars now show a Z field
+  beside the order. Written to world Z, because that is what the camera actually sorts
+  by, which is what "put this in front" means. This is the groundwork for
+  foreground / background layers.
 - **Empty-selection toolbar**: with nothing selected, a small toolbar offers
   创建高度场地形, so starting a level does not mean hunting through the GameObject menu.
   A selection that has no renderer on it stays quiet instead.

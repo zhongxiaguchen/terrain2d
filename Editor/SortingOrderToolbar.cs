@@ -123,6 +123,19 @@ namespace Terrain2D.EditorTools
 
             if (EditorGUI.EndChangeCheck()) ApplyOrder(order);
 
+            // Z 和 sortingOrder 是一套东西的两半：层级相同时 Unity 就是靠 Z 决定谁在前，
+            // 前景 / 背景分层就是靠它。
+            GUILayout.Space(10f);
+            GUILayout.Label("Z", EditorStyles.miniLabel);
+
+            EditorGUI.BeginChangeCheck();
+            EditorGUI.showMixedValue = HasMixedZ();
+            float depth = EditorGUILayout.FloatField(
+                Selected[0].transform.position.z, GUILayout.Width(56f));
+            EditorGUI.showMixedValue = false;
+
+            if (EditorGUI.EndChangeCheck()) ApplyZ(depth);
+
             if (HasColorControl())
             {
                 GUILayout.Space(12f);
@@ -214,6 +227,38 @@ namespace Terrain2D.EditorTools
             {
                 Selected[i].sortingOrder = order;
                 EditorUtility.SetDirty(Selected[i]);
+            }
+
+            SceneView.RepaintAll();
+        }
+
+        static bool HasMixedZ()
+        {
+            if (Selected.Count < 2) return false;
+
+            float first = Selected[0].transform.position.z;
+            for (int i = 1; i < Selected.Count; i++)
+                if (!Mathf.Approximately(Selected[i].transform.position.z, first)) return true;
+
+            return false;
+        }
+
+        static void ApplyZ(float depth)
+        {
+            // World Z, not local: world Z is what the camera actually sorts by, so it is the
+            // number a level designer means when they say "put this in front".
+            var transforms = new UnityEngine.Object[Selected.Count];
+            for (int i = 0; i < Selected.Count; i++) transforms[i] = Selected[i].transform;
+
+            Undo.RecordObjects(transforms, "改 Z");
+
+            for (int i = 0; i < Selected.Count; i++)
+            {
+                Transform transform = Selected[i].transform;
+                Vector3 position = transform.position;
+                position.z = depth;
+                transform.position = position;
+                EditorUtility.SetDirty(transform);
             }
 
             SceneView.RepaintAll();
