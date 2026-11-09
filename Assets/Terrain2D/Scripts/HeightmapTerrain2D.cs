@@ -167,6 +167,12 @@ namespace Terrain2D
         EdgeCollider2D _edge;
         PolygonCollider2D _poly;
 
+        // 地表 X 是否严格递增。自由横拖可以把某个点的 X 拖过它的邻居，那样二分查找
+        // 就不成立了。SampleHeight 可能被寻路/刷怪每帧调用，所以结果缓存起来，
+        // 只在形状变化（Rebuild / 拖点）时失效。
+        bool _topXMonotonic = true;
+        bool _topXMonotonicDirty = true;
+
         MeshFilter Filter => _filter != null ? _filter : (_filter = GetComponent<MeshFilter>());
         MeshRenderer Renderer => _renderer != null ? _renderer : (_renderer = GetComponent<MeshRenderer>());
 
@@ -188,6 +194,66 @@ namespace Terrain2D
             if (!useBottomProfile) return bottomY;
             EnsureBottomHeights();
             return _bottomHeights[Mathf.Clamp(index, 0, _bottomHeights.Length - 1)];
+        }
+
+        /// <summary>
+        /// 取某个本地 X 处**底边**的高度 —— 和渲染实际用的那条底边保持一致。
+        ///
+        /// 挖坑（<see cref="DestroyCircle"/>）必须夹在这个高度之上，否则会把地形
+        /// 打穿到视觉底边以下。以前那里用的是 <see cref="BottomAt"/>，只认
+        /// `_bottomHeights` 和 `bottomY`，完全不看底边的独立折线 —— 于是雕过底边的
+        /// 地形一挖就漏。
+        ///
+        /// 数据来源的优先级和 <see cref="BuildOutline"/> 一致：
+        ///   1. 独立折线 `_bottomEdge`（设计师雕过底边）
+        ///   2. 逐点轮廓 `_bottomHeights`（开了「底部独立轮廓」）
+        ///   3. `bottomY` 平直线
+        /// </summary>
+        public float BottomHeightAt(float localX)
+        {
+            if (HasBottomEdge)
+            {
+                var chain = _bottomEdge;
+                float best = float.NaN;
+
+                // 折线是 右 -> 左 存的，所以 x 递减。逐个区间找跨过 localX 的那些，
+                // 取最高的一个 —— 底边被拖成来回折的时候"最高的底"才是实体下界。
+                for (int i = 0; i < chain.Count - 1; i++)
+                {
+                    float x0 = chain[i].x;
+                    float x1 = chain[i + 1].x;
+                    if (localX < Mathf.Min(x0, x1) || localX > Mathf.Max(x0, x1)) continue;
+
+                    float t = Mathf.Abs(x1 - x0) > 1e-6f ? (localX - x0) / (x1 - x0) : 0f;
+                    float y = Mathf.Lerp(chain[i].y, chain[i + 1].y, t);
+                    if (float.IsNaN(best) || y > best) best = y;
+                }
+
+                if (!float.IsNaN(best)) return best;
+
+                // 落在折线横向范围之外：取最近的那一端。
+                return localX <= chain[chain.Count - 1].x
+                    ? chain[chain.Count - 1].y
+                    : chain[0].y;
+            }
+
+            if (!useBottomProfile) return bottomY;
+
+            EnsureBottomHeights();
+            if (localX <= BottomXAt(0)) return _bottomHeights[0];
+            if (localX >= BottomXAt(sampleCount - 1)) return _bottomHeights[sampleCount - 1];
+
+            for (int i = 0; i < sampleCount - 1; i++)
+            {
+                float x0 = BottomXAt(i);
+                float x1 = BottomXAt(i + 1);
+                if (localX < Mathf.Min(x0, x1) || localX > Mathf.Max(x0, x1)) continue;
+
+                float t = Mathf.Abs(x1 - x0) > 1e-6f ? (localX - x0) / (x1 - x0) : 0f;
+                return Mathf.Lerp(_bottomHeights[i], _bottomHeights[i + 1], t);
+            }
+
+            return bottomY;
         }
 
         /// <summary>
@@ -237,6 +303,7 @@ namespace Terrain2D
             EnsureXOffsets();
             if (index < 0 || index >= _topOffsetsX.Length) return;
             _topOffsetsX[index] = offset;
+            _topXMonotonicDirty = true;
         }
 
         /// <summary>设置某个采样点的底部水平偏移。</summary>
@@ -506,18 +573,46 @@ namespace Terrain2D
 
             if (this == null || !isActiveAndEnabled) return;
 
-            if (_heights == null || _heights.Length != sampleCount) Generate();
-            else
-            {
-                if (useBottomProfile) EnsureBottomHeights();
-                Rebuild();
-            }
+            // 采样点数量变了，高度数组要重铺。这里只重铺地表，**保留**边上的控制点：
+            // 左右链和底边折线早就跟采样点数脱钩了，加点/减点不该把它们一起清掉。
+            if (_heights == null || _heights.Length != sampleCount) GenerateHeights();
+            else if (useBottomProfile) EnsureBottomHeights();
+
+            // GenerateHeights 只改数组，不碰网格 —— 重建统一在这里做，
+            // 两条分支都不会漏掉（漏掉的话改 sampleCount 后视口里还是旧形状）。
+            Rebuild();
         }
 
         // ------------------------------------------------------------------ 生成
 
         [ContextMenu("生成地形")]
         public void Generate()
+        {
+            // 整块重新生成 = 换一块新地形。边上加过的控制点、横向拖出来的偏移
+            // 都属于上一块地形的形状，留着只会让新地形带着旧轮廓长出来。
+            //
+            // 以前这里只重置了 _bottomHeights，于是"在雕过的地形上点生成"会出现
+            // 地表是新的、四条边还是旧的那种半新半旧的状态。
+            LeftEdge.Clear();
+            RightEdge.Clear();
+            BottomEdge.Clear();
+
+            EnsureXOffsets();
+            for (int i = 0; i < _topOffsetsX.Length; i++) _topOffsetsX[i] = 0f;
+            for (int i = 0; i < _bottomOffsetsX.Length; i++) _bottomOffsetsX[i] = 0f;
+
+            GenerateHeights();
+
+            _initialized = true;
+            Rebuild();
+        }
+
+        /// <summary>
+        /// 只按噪声重铺地表高度数组，不碰任何边上的控制点。
+        /// 采样点数量变化时走这里 —— 那种情况下用户要的是"同一块地形换密度"，
+        /// 不是"丢掉我雕的边"。
+        /// </summary>
+        void GenerateHeights()
         {
             EnsureHeights();
 
@@ -555,9 +650,6 @@ namespace Terrain2D
                 EnsureBottomHeights();
                 for (int i = 0; i < _bottomHeights.Length; i++) _bottomHeights[i] = bottomY;
             }
-
-            _initialized = true;
-            Rebuild();
         }
 
         [ContextMenu("拍平地形")]
@@ -793,8 +885,12 @@ namespace Terrain2D
                 if (subtract)
                 {
                     // 地形是地表线以下的实心区域，所以弹坑底取两者较低的那个。
+                    //
+                    // 下限必须用**渲染实际用的那条底边**（BottomHeightAt 会看独立折线）。
+                    // 以前这里是 BottomAt(i)，只认 _bottomHeights / bottomY ——
+                    // 底边被雕成折线之后，挖坑会直接穿过视觉底边，在浮空岛上炸出个洞。
                     if (circleY < _heights[i])
-                        _heights[i] = Mathf.Max(circleY, BottomAt(i) + MinThickness);
+                        _heights[i] = Mathf.Max(circleY, BottomHeightAt(x) + MinThickness);
                 }
                 else
                 {
@@ -808,30 +904,83 @@ namespace Terrain2D
 
         /// <summary>
         /// 取某个本地 X 处的插值地表高度。AI 寻路、刷怪点都能用。
-        /// 采样点被横向拖过之后 X 不再等距，所以这里用二分查找定位区间。
+        ///
+        /// 采样点被横向拖过之后 X 不再等距，但通常仍是递增的，二分查找够用。
+        /// **但递增不是保证** —— 自由 2D 拖动允许把一个点的 X 拖过它的邻居，
+        /// 那时候二分的前提就破了，会返回一个毫无意义的高度。
+        /// 所以先判断单调性：单调走二分，不单调退化成线性扫描。
         /// </summary>
         public float SampleHeight(float localX)
         {
             EnsureHeights();
             if (sampleCount < 2) return baseHeight;
 
-            if (localX <= TopXAt(0)) return _heights[0];
-            if (localX >= TopXAt(sampleCount - 1)) return _heights[sampleCount - 1];
-
-            int lo = 0;
-            int hi = sampleCount - 1;
-
-            while (hi - lo > 1)
+            if (IsTopXMonotonic())
             {
-                int mid = (lo + hi) / 2;
-                if (TopXAt(mid) <= localX) lo = mid;
-                else hi = mid;
+                if (localX <= TopXAt(0)) return _heights[0];
+                if (localX >= TopXAt(sampleCount - 1)) return _heights[sampleCount - 1];
+
+                int lo = 0;
+                int hi = sampleCount - 1;
+
+                while (hi - lo > 1)
+                {
+                    int mid = (lo + hi) / 2;
+                    if (TopXAt(mid) <= localX) lo = mid;
+                    else hi = mid;
+                }
+
+                return LerpTopSegment(lo, localX);
             }
 
-            float x0 = TopXAt(lo);
-            float x1 = TopXAt(hi);
-            float t = x1 - x0 > 1e-6f ? (localX - x0) / (x1 - x0) : 0f;
-            return Mathf.Lerp(_heights[lo], _heights[hi], t);
+            // 地表在 X 上折回来了 —— "这个 X 的高度"本身就有歧义。
+            // 取所有跨过它的区间里最高的那一段：那是玩家实际会站上去的地表。
+            float best = float.NegativeInfinity;
+            for (int i = 0; i < sampleCount - 1; i++)
+            {
+                float x0 = TopXAt(i);
+                float x1 = TopXAt(i + 1);
+                if (localX < Mathf.Min(x0, x1) || localX > Mathf.Max(x0, x1)) continue;
+
+                float y = LerpTopSegment(i, localX);
+                if (y > best) best = y;
+            }
+
+            if (best > float.NegativeInfinity) return best;
+
+            // 一段都没跨过（轮廓自交得很厉害）：退到最近的那个端点。
+            return localX < TopXAt(0) ? _heights[0] : _heights[sampleCount - 1];
+        }
+
+        float LerpTopSegment(int index, float localX)
+        {
+            int next = Mathf.Min(index + 1, sampleCount - 1);
+            float x0 = TopXAt(index);
+            float x1 = TopXAt(next);
+            float t = Mathf.Abs(x1 - x0) > 1e-6f ? (localX - x0) / (x1 - x0) : 0f;
+            return Mathf.Lerp(_heights[index], _heights[next], t);
+        }
+
+        /// <summary>
+        /// 地表各采样点的 X 是否严格递增。结果缓存，形状变化时由 Rebuild / 拖点置脏。
+        /// </summary>
+        bool IsTopXMonotonic()
+        {
+            if (!_topXMonotonicDirty) return _topXMonotonic;
+
+            _topXMonotonicDirty = false;
+            _topXMonotonic = true;
+
+            for (int i = 1; i < sampleCount; i++)
+            {
+                if (TopXAt(i) <= TopXAt(i - 1))
+                {
+                    _topXMonotonic = false;
+                    break;
+                }
+            }
+
+            return _topXMonotonic;
         }
 
         /// <summary>取某个本地 X 处地表点的世界坐标。</summary>
@@ -857,18 +1006,41 @@ namespace Terrain2D
                 _bottomHeights[i] = (old != null && i < old.Length) ? old[i] : bottomY;
         }
 
-        /// <summary>把底部轮廓压回地表下方，保证至少 MinThickness 的厚度。</summary>
+        /// <summary>
+        /// 把底部压回地表下方，保证至少 <see cref="MinThickness"/> 的厚度。
+        ///
+        /// 两套底部数据都要压：逐点轮廓 `_bottomHeights` 和底边的独立折线 `_bottomEdge`。
+        /// 以前只压前者，于是把紫色底边点拖到地表上方时轮廓自交、耳切失败、网格冻结 ——
+        /// 用户看到的是"地形突然不动了"，而不是"这里拖不上去"。
+        /// </summary>
         void ClampBottomProfile()
         {
-            if (!useBottomProfile) return;
+            if (!useBottomProfile && !HasBottomEdge) return;
 
             EnsureHeights();
-            EnsureBottomHeights();
 
-            for (int i = 0; i < sampleCount; i++)
+            if (useBottomProfile)
             {
-                float maxBottom = _heights[i] - MinThickness;
-                if (_bottomHeights[i] > maxBottom) _bottomHeights[i] = maxBottom;
+                EnsureBottomHeights();
+
+                for (int i = 0; i < sampleCount; i++)
+                {
+                    float maxBottom = _heights[i] - MinThickness;
+                    if (_bottomHeights[i] > maxBottom) _bottomHeights[i] = maxBottom;
+                }
+            }
+
+            if (HasBottomEdge)
+            {
+                var chain = _bottomEdge;
+
+                for (int i = 0; i < chain.Count; i++)
+                {
+                    // 地表在折线这个 X 上的高度 —— 用 SampleHeight 而不是按采样下标取，
+                    // 因为折线的点数和采样点数早就脱钩了。
+                    float maxY = SampleHeight(chain[i].x) - MinThickness;
+                    if (chain[i].y > maxY) chain[i] = new Vector2(chain[i].x, maxY);
+                }
             }
         }
 
@@ -887,12 +1059,36 @@ namespace Terrain2D
         public void Rebuild()
         {
             EnsureHeights();
+
+            // 横向偏移数组必须和采样点数对齐，否则 TopXAt 会静默忽略越界的偏移，
+            // 表现就是"某些点的横向拖动没生效"。
+            EnsureXOffsets();
+
+            // 形状变了，地表 X 的单调性要重新判断。
+            _topXMonotonicDirty = true;
+
             ClampBottomProfile();
 
             BuildMesh();
             if (buildColliders) BuildColliders();
 
             ApplyVisuals();
+        }
+
+        /// <summary>
+        /// 运行时创建的网格是 HideFlags.DontSave 的，Unity 不会替我们回收。
+        /// 不销毁的话，切场景 / 进出 Play 模式都会留一份在内存里。
+        /// </summary>
+        void OnDestroy()
+        {
+            if (_mesh == null) return;
+
+            if (_filter != null && _filter.sharedMesh == _mesh) _filter.sharedMesh = null;
+
+            if (Application.isPlaying) Destroy(_mesh);
+            else DestroyImmediate(_mesh);
+
+            _mesh = null;
         }
 
         /// <summary>应用颜色和排序设置。</summary>

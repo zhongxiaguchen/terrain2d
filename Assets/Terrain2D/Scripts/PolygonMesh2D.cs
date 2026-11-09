@@ -83,11 +83,36 @@ namespace Terrain2D
         {
             if (!liveUpdate) return;
 
+#if UNITY_EDITOR
+            // 编辑器里轮廓只会在"选中 + 正在拖点"的时候变。没选中的地形每帧去读一遍
+            // 碰撞体，只是为了确认一件不会发生的事 —— 而 ReadPaths() 里每次 GetPath()
+            // 都要分配一个新数组，一个关卡挂十几个地形就是每帧十几个数组，纯 GC 噪音。
+            //
+            // Play 模式不加这个限制：运行时脚本随时可能在改碰撞体。
+            if (!Application.isPlaying && !UnityEditor.Selection.Contains(gameObject)) return;
+#endif
+
             int hash = ComputeOutlineHash();
             if (hash == _lastHash) return;
 
             _lastHash = hash;
             Rebuild();
+        }
+
+        /// <summary>
+        /// 运行时创建的网格是 HideFlags.DontSave 的，Unity 不会替我们回收。
+        /// 不销毁的话，切场景 / 进出 Play 模式都会留一份在内存里。
+        /// </summary>
+        void OnDestroy()
+        {
+            if (_mesh == null) return;
+
+            if (_filter != null && _filter.sharedMesh == _mesh) _filter.sharedMesh = null;
+
+            if (Application.isPlaying) Destroy(_mesh);
+            else DestroyImmediate(_mesh);
+
+            _mesh = null;
         }
 
         [ContextMenu("重建网格")]

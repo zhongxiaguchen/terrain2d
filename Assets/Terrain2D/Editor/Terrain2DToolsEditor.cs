@@ -685,15 +685,12 @@ namespace Terrain2D.EditorTools
             bool open = SessionState.GetBool(ToolbarKey(id), true);
 
             Rect viewRect = view.position;
-            float width = viewRect.width;
-            float height = viewRect.height;
 
             Handles.BeginGUI();
 
             // 用一个覆盖整个视口的透明区域 + FlexibleSpace 把内容顶到底部。
             // 这样不用去猜"Scene 视图工具栏有多高"，位置永远是贴底的。
-            float areaHeight = Mathf.Max(90f, height - 32f);
-            GUILayout.BeginArea(new Rect(8f, 0f, width - 16f, areaHeight));
+            GUILayout.BeginArea(SceneToolbarLayout.Area(viewRect, 90f));
             GUILayout.FlexibleSpace();
 
             // 轮廓自交的警告贴在工具栏正上方 —— 正在拖点的人一眼就能看到。
