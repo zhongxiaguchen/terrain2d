@@ -50,6 +50,9 @@ ExportedObj/
 Thumbs.db
 desktop.ini
 
+# ---------------------------------------------------------------- 助手工作区（不是项目源码）
+.workbuddy-ai/
+
 # 注意：Assets/ 和 Packages/ 下的 *.meta 必须提交！
 # 只拷 .cs 不拷 .meta 会让 Unity 生成新 GUID，场景里的引用就全断了。
 !/[Aa]ssets/**/*.meta
