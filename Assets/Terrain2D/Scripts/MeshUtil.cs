@@ -167,6 +167,24 @@ namespace Terrain2D
         }
 
         /// <summary>
+        /// 清掉这个渲染器上的颜色覆盖，让材质自身的颜色重新生效。
+        ///
+        /// 关掉「应用颜色」时必须调这个：MaterialPropertyBlock 是挂在**渲染器**上的，
+        /// 一旦写进去就会一直盖着材质，除非有人把它清掉。以前关掉开关只是不再写新值，
+        /// 旧值还在，表现是"关了没反应，得重新加载场景才恢复"。
+        ///
+        /// 用空 block 而不是 null：SetPropertyBlock(null) 各版本行为不完全一致，
+        /// 空 block 是"没有任何覆盖值"，语义明确。
+        /// </summary>
+        public static void ClearColor(MeshRenderer renderer)
+        {
+            if (renderer == null) return;
+
+            ColorBlock.Clear();
+            renderer.SetPropertyBlock(ColorBlock);
+        }
+
+        /// <summary>
         /// 设置 2D 排序层与顺序。层名不存在时保持原样，避免 Unity 报错刷屏。
         /// </summary>
         public static void ApplySorting(MeshRenderer renderer, string layerName, int order)
