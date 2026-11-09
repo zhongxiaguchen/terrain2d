@@ -1287,7 +1287,17 @@ namespace Terrain2D.EditorTools
             if (player == null) return;
 
             // 起点取地表最左端的采样点，抬高半米免得生成在地面里。
-            Vector3 target = terrain.SampleWorldPoint(terrain.TopXAt(0)) + Vector3.up * 0.6f;
+            //
+            // SampleWorldPoint 返回的是 Vector2，**不能**直接和 Vector3 相加：
+            // Unity 给 Vector2 / Vector3 双向都定义了隐式转换，编译器不知道该把
+            // 左边升成 Vector3 还是把右边压成 Vector2，于是报 CS0034 ambiguous。
+            // 拆成显式构造就没有歧义了。Z 跟着地形走，免得把人扔到 z=0 的平面上。
+            Vector2 ground = terrain.SampleWorldPoint(terrain.TopXAt(0));
+
+            Vector3 target = new Vector3(
+                ground.x,
+                ground.y + 0.6f,
+                terrain.transform.position.z);
 
             var body = player.GetComponent<Rigidbody2D>();
 
