@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-10
+
+### Added
+
+- **Three-stage viewport toolbar.** The bottom toolbar now opens with a stage selector —
+  搭建 / 测试 / 资产替换 — and only shows that stage's controls. The three phases look at
+  completely different numbers, so stacking two dozen controls in one place meant hunting
+  through all of them every time. The shell is now a dispatcher
+  (`DrawStageBar` → `DrawBlockoutRows` / `DrawTestRows` / `DrawAssetRows`), so a fourth
+  stage is one more `case`.
+  - **搭建** keeps what was there (colour, edit aids, sorting layer / Z, generate /
+    flatten / rebuild / subdivide / simplify / clear) plus the collider toggle.
+  - **测试** gets the test character: create or select, drop at the left end of the
+    terrain, and live sliders for jump height / move speed / air control that write
+    straight to `TestPlayer2D` — adjustable mid-Play, which is the whole point of a test
+    phase. Also carries `colliderOffsetY` and `colliderStride`, because "I cleared the gap
+    but still fell" is usually a collider/visual mismatch.
+  - **资产替换** gets UV mode, `uvScale`, the UV grid toggle, a readout of how many times
+    the texture repeats along the surface, the `applyColor` switch, and the material
+    handoff state.
+- **「材质存为资产」**: turns the auto-generated embedded material into a real project
+  asset via `AssetDatabase.CreateAsset` (which converts the object in place rather than
+  copying, so the renderer's reference follows). Without this the artist cannot see, edit,
+  or version-control the material at all.
+- **Stage-aware warnings** in the asset phase: a `Scale ≠ 1` warning that computes the
+  spacing needed to preserve the current world width, and an embedded-material warning.
+- `TestPlayer2D` can now be built from code (`Terrain2DMenuItems.BuildTestPlayer`), not
+  just from the menu item, so the toolbar can reuse the exact same setup.
+
+### Fixed
+
+- Turning off 「应用颜色」 no longer leaves the old tint stuck on the renderer. The colour
+  lives in a `MaterialPropertyBlock`, which belongs to the renderer and stays there until
+  something clears it — `ApplyVisuals` only stopped *writing* new values, so the previous
+  one kept overriding the material and the only way back was reloading the scene. It now
+  calls the new `MeshUtil.ClearColor`. This mattered for the asset handoff: the artist
+  would set a colour on the material and see nothing change.
+
+### Notes
+
+- The stage is stored in `EditorPrefs` and is **global**, not per-terrain. It describes
+  how far the level has got, not a property of one object, so selecting a different
+  terrain should not reset it.
+- Switching stages does not change which handles are drawn — that is still controlled by
+  edit mode. Stage only decides which toolbar is shown.
+
 ## [0.2.0] - 2026-11-10
 
 ### Added
@@ -147,5 +193,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Verified on Unity 2022.3.53f1 with URP 14 (2D Renderer).
 
 [Unreleased]: https://github.com/CHANGE_ME/terrain2d/commits/main
+[0.3.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/CHANGE_ME/terrain2d/compare/v0.1.0...v0.1.1

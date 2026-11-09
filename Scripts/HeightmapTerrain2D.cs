@@ -1260,7 +1260,12 @@ namespace Terrain2D
         /// <summary>应用颜色和排序设置。</summary>
         public void ApplyVisuals()
         {
+            // 关掉「应用颜色」时要主动清掉覆盖值，不能只是不写 ——
+            // MaterialPropertyBlock 一旦写进去就一直盖着材质，不清理的话
+            // 用户看到的是"关了开关颜色还是那个颜色"。
             if (applyColor) MeshUtil.ApplyColor(Renderer, color);
+            else MeshUtil.ClearColor(Renderer);
+
             MeshUtil.ApplySorting(Renderer, sortingLayerName, sortingOrder);
         }
 
