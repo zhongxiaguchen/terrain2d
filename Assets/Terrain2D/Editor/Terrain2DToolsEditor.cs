@@ -179,6 +179,8 @@ namespace Terrain2D.EditorTools
             Field("sortingLayerName", "排序层");
             Field("sortingOrder", "排序顺序");
             Field("uvScale", "UV 缩放");
+            Field("uvMode", "UV 模式");
+            Field("showUVGrid", "显示 UV 网格");
             Field("flipWinding", "翻转绕序");
 
             InspectorL10n.Section("碰撞");
@@ -344,10 +346,14 @@ namespace Terrain2D.EditorTools
             if (count < 2) return;
 
             bool editing = IsEditing(terrain);
-            if (!editing && !terrain.showSceneHandles) return;
+            if (!editing && !terrain.showSceneHandles && !terrain.showUVGrid) return;
 
             Transform tr = terrain.transform;
             Event e = Event.current;
+
+            // UV 网格和编辑模式无关 —— 它的用处就是在还没有贴图的时候，
+            // 让人一眼看出弧长映射对不对。
+            if (terrain.showUVGrid) DrawUVGrid(terrain, tr);
 
             // 拖动进行中：接管 MouseDrag / MouseUp。
             if (_dragKind != 0)
@@ -638,6 +644,60 @@ namespace Terrain2D.EditorTools
             Handles.CubeHandleCap(id, world, Quaternion.identity, size, Event.current.type);
 
             return distance;
+        }
+
+        /// <summary>画网格线用的复用缓冲，避免每次重绘都 new 一个数组。</summary>
+        static readonly Vector3[] _gridLine = new Vector3[2];
+
+        /// <summary>
+        /// 沿地表画一排等距刻度，间距 = 1/uvScale 个世界单位 —— 也就是贴图接缝的位置。
+        ///
+        /// 没有贴图的时候，这是唯一能验证弧长映射的办法：
+        /// 平地上等距、**斜坡上沿着坡面看也仍然等距**，说明映射是对的；
+        /// 如果斜坡上的刻度被拉稀或被挤密，说明 U 还在按世界 X 铺，不是按弧长。
+        /// </summary>
+        void DrawUVGrid(HeightmapTerrain2D terrain, Transform tr)
+        {
+            float total = terrain.SurfaceLength;
+            float step = terrain.uvScale > 1e-5f ? 1f / terrain.uvScale : 1f;
+            if (total <= 1e-5f || step <= 1e-5f) return;
+
+            // 上限防止 uvScale 填得极小时画出上万条线把视口拖死。
+            int count = Mathf.Min(2000, Mathf.FloorToInt(total / step) + 1);
+
+            Handles.color = new Color(0.35f, 0.78f, 1f, 0.8f);
+
+            for (int k = 0; k <= count; k++)
+            {
+                int index = IndexAtArcLength(terrain, k * step);
+
+                float x = terrain.TopXAt(index);
+                float y = terrain.Heights[index];
+
+                // 只往下画一小段。画满整个厚度会把轮廓和控制点全挡住。
+                float depth = Mathf.Min(0.8f, Mathf.Abs(y - terrain.BottomHeightAt(x)));
+
+                _gridLine[0] = tr.TransformPoint(new Vector3(x, y, 0f));
+                _gridLine[1] = tr.TransformPoint(new Vector3(x, y - depth, 0f));
+
+                Handles.DrawAAPolyLine(1.5f, _gridLine);
+            }
+        }
+
+        /// <summary>按弧长反查采样点下标。弧长是单调累加的，二分就行。</summary>
+        static int IndexAtArcLength(HeightmapTerrain2D terrain, float distance)
+        {
+            int lo = 0;
+            int hi = terrain.sampleCount - 1;
+
+            while (hi - lo > 1)
+            {
+                int mid = (lo + hi) / 2;
+                if (terrain.ArcLengthAt(mid) <= distance) lo = mid;
+                else hi = mid;
+            }
+
+            return lo;
         }
 
         void DrawOutline(HeightmapTerrain2D terrain, Transform tr, float[] top, float[] bottom, int count)
@@ -1422,6 +1482,40 @@ namespace Terrain2D.EditorTools
         static void CreateHeightmapTerrain(MenuCommand command)
         {
             CreateTerrain(command.context as GameObject);
+        }
+
+        [MenuItem("GameObject/地形 2D/创建测试角色", false, 12)]
+        static void CreateTestPlayer(MenuCommand command)
+        {
+            var parent = command.context as GameObject;
+
+            var go = new GameObject("测试角色");
+            GameObjectUtility.SetParentAndAlign(go, parent);
+            Undo.RegisterCreatedObjectUndo(go, "创建测试角色");
+
+            // 先按顺序把组件摆好，参数也就顺手定了；TestPlayer2D 上的
+            // [RequireComponent] 只是兜底，不该指望它来配参数。
+            var sprite = go.AddComponent<SpriteRenderer>();
+            sprite.sortingOrder = 100;
+
+            var body = go.AddComponent<Rigidbody2D>();
+            body.gravityScale = 2.5f;
+            body.freezeRotation = true;
+
+            var capsule = go.AddComponent<CapsuleCollider2D>();
+            capsule.direction = CapsuleDirection2D.Vertical;
+            capsule.size = new Vector2(0.62f, 1f);
+
+            go.AddComponent<TestPlayer2D>();
+
+            if (parent == null)
+            {
+                var view = SceneView.lastActiveSceneView;
+                if (view != null)
+                    go.transform.position = new Vector3(view.pivot.x, view.pivot.y, 0f);
+            }
+
+            Selection.activeGameObject = go;
         }
 
         /// <summary>
