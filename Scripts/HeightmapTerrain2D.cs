@@ -91,8 +91,28 @@ namespace Terrain2D
         [Tooltip("2D 排序顺序。数值越大越靠前（越靠镜头）。")]
         public int sortingOrder = 0;
 
-        [Tooltip("UV 按平面映射：x × uvScale、y × uvScale。")]
+        [Tooltip("UV 按世界单位换算：1 / uvScale = 贴图重复一次所跨的世界距离。")]
         public float uvScale = 0.5f;
+
+        /// <summary>
+        /// UV 的生成方式。
+        /// </summary>
+        public enum UVMode
+        {
+            [InspectorName("平面映射")]
+            Planar,
+
+            [InspectorName("沿曲面平铺")]
+            SurfaceTiling
+        }
+
+        [Tooltip("平面映射：按世界 X/Y 铺，最简单但斜坡上贴图会被拉长。\n" +
+                 "沿曲面平铺：按地表弧长铺，贴图跟着起伏走，密度处处一致。")]
+        public UVMode uvMode = UVMode.Planar;
+
+        [Tooltip("在 Scene 视图里画出贴图接缝的位置（每 1/uvScale 个世界单位一条）。" +
+                 "没有贴图的时候，看这些刻度是否等距，就能判断弧长映射对不对。")]
+        public bool showUVGrid = false;
 
         [Tooltip("如果材质开了背面剔除导致地形看不见，把这个打开。")]
         public bool flipWinding = false;
@@ -172,6 +192,14 @@ namespace Terrain2D
         // 只在形状变化（Rebuild / 拖点）时失效。
         bool _topXMonotonic = true;
         bool _topXMonotonicDirty = true;
+
+        // 「沿曲面平铺」UV 需要的两组派生数据，每次 Rebuild 重算一遍：
+        //   _arcLength[i] —— 从起点沿地表走到第 i 个采样点的距离
+        //   _slopeCos[i]  —— 该处地表法线的 Y 分量（= cos 坡角）
+        // U 用弧长、V 用「垂直厚度 × cos 坡角」，两者都是世界单位，
+        // 所以贴图密度处处一致，陡坡上不会被拉长。
+        float[] _arcLength;
+        float[] _slopeCos;
 
         MeshFilter Filter => _filter != null ? _filter : (_filter = GetComponent<MeshFilter>());
         MeshRenderer Renderer => _renderer != null ? _renderer : (_renderer = GetComponent<MeshRenderer>());
@@ -983,6 +1011,141 @@ namespace Terrain2D
             return _topXMonotonic;
         }
 
+        // ------------------------------------------------------------------ 弧长 / UV
+
+        /// <summary>
+        /// 重算弧长和坡角。每次 Rebuild 调一次，O(n)，很便宜。
+        /// </summary>
+        void UpdateSurfaceMetrics()
+        {
+            EnsureHeights();
+
+            int n = Mathf.Max(2, sampleCount);
+            if (_arcLength == null || _arcLength.Length != n) _arcLength = new float[n];
+            if (_slopeCos == null || _slopeCos.Length != n) _slopeCos = new float[n];
+
+            _arcLength[0] = 0f;
+
+            for (int i = 1; i < n; i++)
+            {
+                float dx = TopXAt(i) - TopXAt(i - 1);
+                float dy = _heights[i] - _heights[i - 1];
+                _arcLength[i] = _arcLength[i - 1] + Mathf.Sqrt(dx * dx + dy * dy);
+            }
+
+            for (int i = 0; i < n; i++)
+            {
+                // 用中心差分求切线，端点退化成单侧差分。
+                int a = Mathf.Max(0, i - 1);
+                int b = Mathf.Min(n - 1, i + 1);
+
+                float dx = TopXAt(b) - TopXAt(a);
+                float dy = _heights[b] - _heights[a];
+                float len = Mathf.Sqrt(dx * dx + dy * dy);
+
+                // cos(坡角) = |dx| / 线段长。垂直厚度乘上它才是垂直地表方向的厚度。
+                _slopeCos[i] = len > 1e-6f ? Mathf.Abs(dx) / len : 1f;
+            }
+        }
+
+        /// <summary>第 index 个采样点处，沿地表从起点量起的距离（世界单位）。</summary>
+        public float ArcLengthAt(int index)
+        {
+            if (_arcLength == null || _arcLength.Length == 0) return 0f;
+            return _arcLength[Mathf.Clamp(index, 0, _arcLength.Length - 1)];
+        }
+
+        /// <summary>地表从起点到终点的总长度（世界单位）。</summary>
+        public float SurfaceLength
+        {
+            get
+            {
+                return _arcLength != null && _arcLength.Length > 0
+                    ? _arcLength[_arcLength.Length - 1]
+                    : 0f;
+            }
+        }
+
+        /// <summary>第 index 个采样点处地表法线的 Y 分量（= cos 坡角）。</summary>
+        public float SlopeCosAt(int index)
+        {
+            if (_slopeCos == null || _slopeCos.Length == 0) return 1f;
+            return _slopeCos[Mathf.Clamp(index, 0, _slopeCos.Length - 1)];
+        }
+
+        /// <summary>
+        /// 找到跨过 localX 的地表区间下标。单调时二分，否则线性扫。
+        /// 完全落在横向范围之外时返回 -1。
+        /// </summary>
+        int FindTopSegment(float localX)
+        {
+            if (sampleCount < 2) return -1;
+
+            if (IsTopXMonotonic())
+            {
+                if (localX <= TopXAt(0)) return 0;
+                if (localX >= TopXAt(sampleCount - 1)) return sampleCount - 2;
+
+                int lo = 0;
+                int hi = sampleCount - 1;
+
+                while (hi - lo > 1)
+                {
+                    int mid = (lo + hi) / 2;
+                    if (TopXAt(mid) <= localX) lo = mid;
+                    else hi = mid;
+                }
+
+                return lo;
+            }
+
+            for (int i = 0; i < sampleCount - 1; i++)
+            {
+                float x0 = TopXAt(i);
+                float x1 = TopXAt(i + 1);
+                if (localX >= Mathf.Min(x0, x1) && localX <= Mathf.Max(x0, x1)) return i;
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// 沿曲面平铺用的 UV：U 是沿地表的弧长，V 是垂直地表往下的距离。
+        /// 两者都以世界单位计，再乘 uvScale —— 所以 1/uvScale 就是贴图重复一次的距离。
+        /// </summary>
+        Vector2 SurfaceUV(Vector2 localVertex)
+        {
+            int seg = FindTopSegment(localVertex.x);
+
+            if (seg < 0)
+            {
+                // 顶点落在轮廓横向范围之外，退回平面映射，别让 UV 变成 NaN。
+                return new Vector2(localVertex.x * uvScale, localVertex.y * uvScale);
+            }
+
+            int next = Mathf.Min(seg + 1, sampleCount - 1);
+
+            float x0 = TopXAt(seg);
+            float x1 = TopXAt(next);
+            float t = Mathf.Abs(x1 - x0) > 1e-6f
+                ? Mathf.Clamp01((localVertex.x - x0) / (x1 - x0))
+                : 0f;
+
+            float u = Mathf.Lerp(_arcLength[seg], _arcLength[next], t);
+            float topY = Mathf.Lerp(_heights[seg], _heights[next], t);
+            float cos = Mathf.Lerp(_slopeCos[seg], _slopeCos[next], t);
+
+            return new Vector2(u * uvScale, (topY - localVertex.y) * cos * uvScale);
+        }
+
+        /// <summary>按当前 uvMode 算一个顶点的 UV。</summary>
+        Vector2 UvFor(float x, float y)
+        {
+            return uvMode == UVMode.SurfaceTiling
+                ? SurfaceUV(new Vector2(x, y))
+                : new Vector2(x * uvScale, y * uvScale);
+        }
+
         /// <summary>取某个本地 X 处地表点的世界坐标。</summary>
         public Vector2 SampleWorldPoint(float localX)
         {
@@ -1068,6 +1231,9 @@ namespace Terrain2D
             _topXMonotonicDirty = true;
 
             ClampBottomProfile();
+
+            // 弧长和坡角是 UV 的输入，必须在铺网格之前算好。
+            UpdateSurfaceMetrics();
 
             BuildMesh();
             if (buildColliders) BuildColliders();
@@ -1170,8 +1336,8 @@ namespace Terrain2D
                 verts.Add(new Vector3(x, topY, 0f));       // 2i   地表
                 verts.Add(new Vector3(botX, botY, 0f));    // 2i+1 底部
 
-                uvs.Add(new Vector2(x * uvScale, topY * uvScale));
-                uvs.Add(new Vector2(botX * uvScale, botY * uvScale));
+                uvs.Add(UvFor(x, topY));       // 2i   地表
+                uvs.Add(UvFor(botX, botY));    // 2i+1 底部
             }
 
             for (int i = 0; i < n - 1; i++)
@@ -1223,7 +1389,7 @@ namespace Terrain2D
             for (int i = 0; i < outline.Count; i++)
             {
                 verts.Add(new Vector3(outline[i].x, outline[i].y, 0f));
-                uvs.Add(new Vector2(outline[i].x * uvScale, outline[i].y * uvScale));
+                uvs.Add(UvFor(outline[i].x, outline[i].y));
             }
 
             _mesh = MeshUtil.Build("HeightmapTerrain2D", _mesh, verts, uvs, tris, flipWinding);

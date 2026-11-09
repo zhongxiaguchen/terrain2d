@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-09
+
+### Added
+
+- **Surface-following UVs (`uvMode`)**: a second UV mapping mode alongside the original
+  planar one. `Planar` keeps the old behaviour — UV is world X/Y times `uvScale`, which is
+  trivial but stretches the texture on slopes by `1 / cos(slope)`. `SurfaceTiling` walks
+  the surface instead: U is the **arc length** from the start of the surface, V is the
+  **perpendicular distance** below it (vertical depth times `cos(slope)`). Both are in
+  world units, so `1 / uvScale` means the same thing everywhere and texel density is
+  constant across flats, ramps, and cliffs. Defaults to `Planar`, so existing scenes look
+  exactly as they did.
+- `SurfaceLength`, `ArcLengthAt(index)`, `SlopeCosAt(index)`: the derived metrics behind
+  the new mode, exposed publicly. `SurfaceLength` is the total walkable length of the
+  surface; the other two read per-sample values. Rebuilt once per `Rebuild()` in O(n) —
+  cheap enough to leave unconditional.
+- **UV grid overlay (`showUVGrid`)**: draws a tick along the surface every `1 / uvScale`
+  world units in the Scene view, so the mapping can be checked **before any texture
+  exists**. Even spacing on a flat *and* even spacing measured along a ramp is the proof
+  that U is arc-length driven; ticks that thin out on ramps mean it is still planar. Capped
+  at 2000 lines so a tiny `uvScale` cannot lock up the viewport.
+- **`TestPlayer2D`** — a controllable test character, created from
+  `GameObject → 地形 2D → 创建测试角色`. Left/right, jump, coyote time, jump buffer, and an
+  extra fall multiplier; jump height is expressed in world units (`v = sqrt(2gh)`) rather
+  than raw velocity, so it can be compared directly against the gaps in the level.
+  Ground detection uses `Rigidbody2D.IsTouching` with a normal-angle filter, so standing
+  against a wall does not count as grounded and slopes up to `maxSlopeAngle` do.
+  It generates its own 16×16 placeholder sprite and a frictionless `PhysicsMaterial2D`
+  (both `HideAndDontSave`, shared per process), so it is visible and playable with zero art.
+  Deliberately **not** a production controller — it exists to answer "can I jump that gap"
+  immediately after editing the terrain.
+
+### Notes
+
+- `TestPlayer2D` uses the legacy `Input` API, matching this project's
+  `activeInputHandler: 0`. A project on the new Input System needs the four lines in
+  `Update()` replaced with `InputAction` reads.
+- `TestPlayer2D` only touches the `Rigidbody2D` in Play mode. Configuring it from `Awake`
+  in edit mode would dirty the scene on every recompile.
+
+## [0.1.1] - 2026-11-09
+
 ### Added
 
 - `HeightmapTerrain2D`: equal-spacing height field terrain with a closed
@@ -105,3 +147,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Verified on Unity 2022.3.53f1 with URP 14 (2D Renderer).
 
 [Unreleased]: https://github.com/CHANGE_ME/terrain2d/commits/main
+[0.2.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/CHANGE_ME/terrain2d/compare/v0.1.0...v0.1.1
