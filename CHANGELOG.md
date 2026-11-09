@@ -60,8 +60,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rather than to the project — a deliberate trade, since a swatch list in the project
   folder would show up in version control and merge badly.
 
+### Fixed
+
+- `DestroyCircle` no longer punches through a sculpted bottom edge. The crater floor used
+  `BottomAt(index)`, which only knows about `_bottomHeights` and `bottomY` — it never
+  looked at the independent `_bottomEdge` polyline. On a terrain whose bottom had been
+  sculpted (a floating island, an overhang) a crater would cut straight through the
+  visible bottom and leave a hole. There is now a `BottomHeightAt(localX)` that resolves
+  the bottom the same way `BuildOutline` does, and the crater clamps against it.
+- Bottom edge points can no longer be dragged above the surface. `ClampBottomProfile`
+  only clamped `_bottomHeights`; `_bottomEdge` was left free, so a bottom point pulled
+  above the top curve made the outline self-intersect, ear clipping failed, and the mesh
+  silently froze. Both sources are clamped now, so the point simply refuses to go above
+  the ground.
+- `SampleHeight` no longer returns nonsense when surface points are dragged past each
+  other. It assumed `TopXAt(i)` was monotonically increasing and binary-searched on that
+  assumption; free horizontal dragging can break it. Monotonicity is now checked (and
+  cached, invalidated on `Rebuild`), with a linear fallback that takes the highest surface
+  crossing the query X.
+- `Generate()` now resets the shape overrides it used to leave behind: `LeftEdge`,
+  `RightEdge`, `BottomEdge`, and both horizontal offset arrays. Previously it only reset
+  `_bottomHeights`, so regenerating on an already-sculpted terrain produced a new surface
+  wearing the old outline. Changing `sampleCount` in the Inspector still goes through a
+  new `GenerateHeights()` that only re-lays the surface and keeps the edges — that path
+  is "same terrain, different density", not "throw my edges away".
+- `PolygonMesh2D` no longer allocates every frame in the editor. Its live-update poll ran
+  on every instance regardless of selection, and `ReadPaths()` allocates a `Vector2[]`
+  per path per call — a level with a dozen terrains meant a dozen array allocations per
+  frame. In edit mode the poll now only runs while the object is selected (the outline
+  can only change while you are dragging its points); Play mode is unchanged, since
+  runtime scripts can edit colliders at any time.
+- Meshes created at runtime are now destroyed in `OnDestroy`. They carry
+  `HideFlags.DontSave`, so Unity never reclaims them — every scene load and every Play
+  mode round-trip leaked one mesh per terrain.
+- The three scene-view toolbars no longer share a hard-coded `32f` bottom inset. It is
+  now `SceneToolbarLayout.BottomInset`, derived from `EditorGUIUtility.singleLineHeight`
+  so it follows UI scale and high-DPI displays instead of fighting them.
+
 ### Notes
 
+- The edit-mode live-update gate in `PolygonMesh2D` means an unselected `PolygonMesh2D`
+  will not pick up outline changes made by a script. Call `Rebuild()` yourself in that
+  case, or leave the object selected.
 - Verified on Unity 2022.3.53f1 with URP 14 (2D Renderer).
 
 [Unreleased]: https://github.com/CHANGE_ME/terrain2d/commits/main

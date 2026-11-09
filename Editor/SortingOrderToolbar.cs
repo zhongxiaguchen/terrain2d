@@ -73,11 +73,10 @@ namespace Terrain2D.EditorTools
 
             // Same trick as everywhere else here: cover the viewport with a transparent area
             // and push the content to the bottom with FlexibleSpace, so there is no need to
-            // know how tall the Scene view toolbar is.
-            float areaHeight = Mathf.Max(60f, viewRect.height - 32f);
-
+            // know how tall the Scene view toolbar is. The bottom inset lives in
+            // SceneToolbarLayout so all three toolbars stay in the same place.
             Handles.BeginGUI();
-            GUILayout.BeginArea(new Rect(8f, 0f, viewRect.width - 16f, areaHeight));
+            GUILayout.BeginArea(SceneToolbarLayout.Area(viewRect, 60f));
             GUILayout.FlexibleSpace();
 
             GUILayout.BeginVertical("box");
@@ -109,10 +108,8 @@ namespace Terrain2D.EditorTools
         {
             Rect viewRect = view.position;
 
-            float areaHeight = Mathf.Max(60f, viewRect.height - 32f);
-
             Handles.BeginGUI();
-            GUILayout.BeginArea(new Rect(8f, 0f, viewRect.width - 16f, areaHeight));
+            GUILayout.BeginArea(SceneToolbarLayout.Area(viewRect, 60f));
             GUILayout.FlexibleSpace();
 
             GUILayout.BeginVertical("box");
