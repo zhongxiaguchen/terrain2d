@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-11-10
+
+### Fixed
+
+- **「有时候踏空」—— 碰撞折线缺了地形两端的边界链顶点。**
+  `BuildOutline()` 画视觉轮廓时，顶部是从**左边链的顶点**开始的，然后才连到
+  地表第一个采样点。而 `BuildColliders()` 只从地表采样点开始建 `EdgeCollider2D`。
+
+  只要用户把左边界拖离地表端点，两者之间那段就在视觉上有地面、碰撞上是空的 ——
+  走过去直接掉下去。实测某块地形左边链顶点在 `x ≈ 1.8`、地表第一个采样点在
+  `x ≈ 14.8`，中间 13 个单位全是"看得见踩不着"。
+
+  现在碰撞折线按 `左链顶点 → 地表采样点 → 右链顶点` 组装，和 `BuildOutline()`
+  用同一套点。两端没有链时行为不变。
+
+- **关掉「生成碰撞体」之后，已经生成的碰撞体仍然生效。**
+  `Rebuild()` 原来只写了 `if (buildColliders) BuildColliders();` —— 关掉时直接跳过，
+  之前挂上去的 `EdgeCollider2D` 还留在物体上、还是 `enabled`，于是"我明明关了碰撞，
+  走过去照样被挡住"。
+
+  只有 `SetCollisionEnabled()` 那条路径会主动禁用，而直接改 Inspector 的勾选框走的是
+  `OnValidate → Rebuild()`，绕过了它。现在 `Rebuild()` 在关掉时调用
+  `DisableColliders()` 兜住。
+
 ## [0.5.2] - 2026-11-10
 
 ### Fixed

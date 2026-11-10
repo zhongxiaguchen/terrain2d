@@ -1236,9 +1236,27 @@ namespace Terrain2D
             UpdateSurfaceMetrics();
 
             BuildMesh();
+
+            // 关掉「生成碰撞体」时必须把已经生成的那些**也禁用掉**，
+            // 只跳过 BuildColliders() 是不够的 —— 之前挂上去的 EdgeCollider2D
+            // 还在、还是 enabled，于是"我明明关了碰撞，走过去照样被挡住"。
+            //
+            // 直接改 Inspector 的勾选框走的是 OnValidate → Rebuild()，
+            // 根本不经过 SetCollisionEnabled()，所以这里必须兜住。
             if (buildColliders) BuildColliders();
+            else DisableColliders();
 
             ApplyVisuals();
+        }
+
+        /// <summary>
+        /// 把所有已经生成的碰撞体关掉，但不销毁 —— 重新打开开关时直接复用，
+        /// 不用再 AddComponent 一次。
+        /// </summary>
+        void DisableColliders()
+        {
+            if (_edge != null) _edge.enabled = false;
+            if (_poly != null) _poly.enabled = false;
         }
 
         /// <summary>
@@ -1410,18 +1428,50 @@ namespace Terrain2D
             var top = new List<Vector2>();
             var bottom = new List<Vector2>();
 
+            // 视觉轮廓的顶部**不是**从地表的第一个采样点开始的 —— BuildOutline()
+            // 会先把左边链的顶点连过来。用户把左边界拖离地表端点之后，那一段在
+            // 视觉上有地面、碰撞折线里却没有，走过去就是"踏空"。
+            //
+            // 实测某块地形的左边链顶点在 x ≈ 1.8，而地表第一个采样点在 x ≈ 14.8，
+            // 中间 13 个单位视觉上是封住的、碰撞上完全空白。
+            //
+            // 所以碰撞折线必须把两端的链顶点也带上，和 BuildOutline() 用同一套点。
+            var leftChain = LeftEdge;
+
+            if (leftChain.Count > 0)
+            {
+                Vector2 end = leftChain[leftChain.Count - 1];
+                top.Add(new Vector2(end.x, end.y + colliderOffsetY));
+            }
+
             for (int i = 0; i < sampleCount; i += stride)
             {
                 top.Add(new Vector2(TopXAt(i), _heights[i] + colliderOffsetY));
                 bottom.Add(new Vector2(BottomXAt(i), BottomAt(i) + colliderOffsetY));
             }
 
-            if (top.Count < 2 ||
-                top[top.Count - 1].x < TopXAt(sampleCount - 1) - 1e-4f)
+            // stride 跳过了最后一个采样点就补回来 —— 否则地形右端会缺一截碰撞。
+            if ((sampleCount - 1) % stride != 0)
             {
                 int last = sampleCount - 1;
                 top.Add(new Vector2(TopXAt(last), _heights[last] + colliderOffsetY));
                 bottom.Add(new Vector2(BottomXAt(last), BottomAt(last) + colliderOffsetY));
+            }
+
+            // 右边链的起点同理：视觉从那里开始往下走，碰撞也要跟过去。
+            var rightChain = RightEdge;
+
+            if (rightChain.Count > 0)
+            {
+                Vector2 start = rightChain[0];
+                top.Add(new Vector2(start.x, start.y + colliderOffsetY));
+            }
+
+            if (top.Count < 2)
+            {
+                // 连两个点都凑不出来，说明地形数据坏了。保留上一次的碰撞体，
+                // 别把玩家脚底下的地面撤掉。
+                return;
             }
 
             if (buildEdgeCollider)
