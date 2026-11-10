@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-10
+
+### Added
+
+- **The stage selector is now always on screen.** It used to appear only while a terrain
+  was selected, so deselecting to look at the whole level made the current stage vanish —
+  the one piece of state that describes where the level is, not which object you happen to
+  be clicking. The empty-selection bar now opens with the same 搭建 / 测试 / 资产替换
+  selector, and offers the one action that stage needs first:
+  - **搭建** → 创建高度场地形
+  - **测试** → 创建测试角色
+  - **资产替换** → a hint, since this stage starts from a terrain that already exists
+- `TerrainStage` (Editor) owns the stage enum, the persisted value, and the selector's
+  drawing. Two mutually exclusive toolbars share it, so the state cannot live on either.
+
+### Fixed
+
+- Selecting a terrain while edit mode was off left the bottom of the viewport completely
+  empty — the terrain toolbar was gated on edit mode and the sorting toolbar stands down
+  for terrain selections, so both backed off at once. The toolbar now draws regardless;
+  edit mode only controls whether the control points are drawn.
+
 ## [0.3.0] - 2026-11-10
 
 ### Added
@@ -193,6 +215,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Verified on Unity 2022.3.53f1 with URP 14 (2D Renderer).
 
 [Unreleased]: https://github.com/CHANGE_ME/terrain2d/commits/main
+[0.3.1]: https://github.com/CHANGE_ME/terrain2d/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/CHANGE_ME/terrain2d/compare/v0.1.0...v0.1.1
