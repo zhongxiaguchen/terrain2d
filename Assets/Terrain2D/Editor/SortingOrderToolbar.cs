@@ -126,9 +126,34 @@ namespace Terrain2D.EditorTools
             switch (TerrainStage.Current)
             {
                 case WorkStage.Test:
-                    if (GUILayout.Button("创建测试角色", EditorStyles.miniButton))
+                {
+                    // 先选镜头怎么跟，再建角色。角色和镜头是一套测试装备 ——
+                    // 建完再选的话，按下 Play 的头两秒人是跑出画面的。
+                    GUILayout.BeginHorizontal();
+
+                    GUILayout.Label("摄像机", EditorStyles.miniLabel);
+
+                    EditorGUI.BeginChangeCheck();
+                    int picked = EditorGUILayout.Popup(
+                        (int)TestCameraPrefs.Mode, TestCameraPrefs.Labels,
+                        EditorStyles.popup, GUILayout.Width(78f));
+
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        TestCameraPrefs.Mode = (TestCameraMode)picked;
+                        SceneView.RepaintAll();
+                    }
+
+                    GUILayout.FlexibleSpace();
+                    GUILayout.EndHorizontal();
+
+                    // 按钮上带着模式名，免得"我明明选了固定怎么还跟着"这种误会。
+                    if (GUILayout.Button("创建测试角色（" + TestCameraPrefs.ModeLabel + "）",
+                                         EditorStyles.miniButton))
                         EditorApplication.ExecuteMenuItem(CreatePlayerMenu);
+
                     break;
+                }
 
                 case WorkStage.Asset:
                     // 资产替换阶段没有"凭空造一个东西"的动作 —— 它的起点是选中一块

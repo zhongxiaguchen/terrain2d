@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-10
+
+### Changed
+
+- **摄像机模式在创建之前选。** 测试阶段的面板把「摄像机」挪到了「创建测试角色」上面，
+  什么都没选时的阶段面板也多了一行摄像机下拉，创建按钮上直接带着模式名
+  （`创建测试角色（跟随）`）。之前模式只能建完之后改，而建完再改意味着按下 Play
+  的头两秒人已经跑出画面了 —— 摄像机是创建时就要定下来的东西。
+- `TestCameraPrefs`（Editor）单独持有模式选项和 `EditorPrefs` 值。菜单项、地形面板、
+  阶段面板三处都要读，让后两者直接引用 `Terrain2DMenuItems` 会产生编译期依赖，
+  而 Unity 的增量编译出现过「先编译、后导入」导致 `does not contain a definition`。
+
 ## [0.5.0] - 2026-11-10
 
 ### Added
@@ -277,6 +289,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Verified on Unity 2022.3.53f1 with URP 14 (2D Renderer).
 
 [Unreleased]: https://github.com/CHANGE_ME/terrain2d/commits/main
+[0.5.1]: https://github.com/CHANGE_ME/terrain2d/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/CHANGE_ME/terrain2d/compare/v0.3.0...v0.3.1
