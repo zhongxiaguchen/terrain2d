@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **按 Play 自动对准视口**（`PlayModeCameraSync`，默认开）。在 `ExitingEditMode`
+  回调里把主相机抄到 Scene 视图的位置 —— 这个回调发生在 Unity 给场景拍快照之前，
+  所以改出来的位置会被带进 Play。这才是「按 Play 一片蓝」的正解：懵的时候人是不会
+  想到先去找按钮点一下的，所见即所得应该是不需要操作的默认行为。
+  相机上挂着 `TestCamera2D` 且已经设了 `target` 时跳过 —— 那种情况要的是跟着角色跑，
+  覆盖用户摆好的构图反而更糟。
 - **「对准视口」—— 把相机抄到 Scene 视图现在看的地方。** 位置取视口焦点沿视线
   反方向退 10 单位（2D 视口 forward 就是 +Z，pivot 的 z 通常是 0，正好落在相机
   默认的 `z = -10` 上），朝向和正交尺寸都跟 Scene 视图一致。人已经把视口挪到想看
