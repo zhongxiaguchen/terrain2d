@@ -217,6 +217,8 @@ MonoBehaviour:
   sortingLayerName: Default
   sortingOrder: 0
   uvScale: 0.5
+  uvMode: 0
+  showUVGrid: 0
   flipWinding: 0
   buildColliders: 1
   buildEdgeCollider: 1
@@ -424,6 +426,8 @@ MonoBehaviour:
   sortingLayerName: Default
   sortingOrder: 0
   uvScale: 0.5
+  uvMode: 0
+  showUVGrid: 0
   flipWinding: 0
   buildColliders: 1
   buildEdgeCollider: 1
@@ -970,6 +974,8 @@ MonoBehaviour:
   sortingLayerName: Default
   sortingOrder: 0
   uvScale: 0.5
+  uvMode: 0
+  showUVGrid: 0
   flipWinding: 0
   buildColliders: 1
   buildEdgeCollider: 1
@@ -1551,6 +1557,8 @@ MonoBehaviour:
   sortingLayerName: Default
   sortingOrder: 0
   uvScale: 0.5
+  uvMode: 0
+  showUVGrid: 0
   flipWinding: 0
   buildColliders: 1
   buildEdgeCollider: 1
@@ -2140,6 +2148,8 @@ MonoBehaviour:
   sortingLayerName: Default
   sortingOrder: 0
   uvScale: 0.5
+  uvMode: 0
+  showUVGrid: 0
   flipWinding: 0
   buildColliders: 1
   buildEdgeCollider: 1
@@ -2672,6 +2682,8 @@ MonoBehaviour:
   sortingLayerName: Default
   sortingOrder: 0
   uvScale: 0.5
+  uvMode: 0
+  showUVGrid: 0
   flipWinding: 0
   buildColliders: 1
   buildEdgeCollider: 1
@@ -3489,6 +3501,8 @@ MonoBehaviour:
   sortingLayerName: Default
   sortingOrder: 0
   uvScale: 0.5
+  uvMode: 0
+  showUVGrid: 0
   flipWinding: 0
   buildColliders: 1
   buildEdgeCollider: 1
@@ -3709,6 +3723,8 @@ MonoBehaviour:
   sortingLayerName: Default
   sortingOrder: 0
   uvScale: 0.5
+  uvMode: 0
+  showUVGrid: 0
   flipWinding: 0
   buildColliders: 1
   buildEdgeCollider: 1
@@ -3910,6 +3926,8 @@ MonoBehaviour:
   sortingLayerName: Default
   sortingOrder: 0
   uvScale: 0.5
+  uvMode: 0
+  showUVGrid: 0
   flipWinding: 0
   buildColliders: 0
   buildEdgeCollider: 1

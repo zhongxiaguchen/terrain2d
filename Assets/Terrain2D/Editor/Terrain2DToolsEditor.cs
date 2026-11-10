@@ -1095,6 +1095,17 @@ namespace Terrain2D.EditorTools
             GUILayout.Label("层级大在上　Z 小在前", EditorStyles.miniLabel);
 
             GUILayout.EndHorizontal();
+
+            // 相机不对准地形是「按 Play 一片蓝」的头号原因，搭建阶段也得能点 ——
+            // 人往往是在搭的时候顺手按一下 Play 看看，不会专门切到测试阶段。
+            GUILayout.BeginHorizontal();
+
+            if (GUILayout.Button("对准地形", EditorStyles.miniButton, GUILayout.Width(64f)))
+                Terrain2DMenuItems.FrameTerrain(ResolveCamera(), terrain);
+
+            GUILayout.FlexibleSpace();
+
+            GUILayout.EndHorizontal();
         }
 
         /// <summary>
@@ -1170,6 +1181,23 @@ namespace Terrain2D.EditorTools
             return _testCamera;
         }
 
+        /// <summary>
+        /// 该拿哪台相机去框地形。有测试摄像机就用它（TestCamera2D 就挂在相机物体上），
+        /// 否则退回主摄像机。两个阶段都要用，所以单独抽出来。
+        /// </summary>
+        static Camera ResolveCamera()
+        {
+            var rig = FindTestCamera();
+
+            if (rig != null)
+            {
+                var cam = rig.GetComponent<Camera>();
+                if (cam != null) return cam;
+            }
+
+            return Camera.main;
+        }
+
         static HeightmapTerrain2DEditor()
         {
             // 只在"场景里的物体变了"时清缓存。挂在 static 构造里而不是
@@ -1193,7 +1221,7 @@ namespace Terrain2D.EditorTools
             //
             // 放在角色上面：角色和镜头是一套测试装备，而且镜头的模式是**创建时**用到的。
             // 先建角色再选模式的话，按下 Play 的头两秒人是跑出画面的。
-            DrawCameraRow();
+            DrawCameraRow(terrain);
 
             // ---- 角色 ----
             GUILayout.BeginHorizontal();
@@ -1326,12 +1354,12 @@ namespace Terrain2D.EditorTools
         }
 
         /// <summary>
-        /// 摄像机那一行：模式下拉 + 选中按钮。
+        /// 摄像机那一行：模式下拉 + 选中按钮，下面跟一个「对准地形」。
         ///
         /// 还没有摄像机时下拉照样能改 —— 改的是"创建时用哪个模式"，
         /// 存在 EditorPrefs 里，所以默认值「跟随」在重启后仍然成立。
         /// </summary>
-        void DrawCameraRow()
+        void DrawCameraRow(HeightmapTerrain2D terrain)
         {
             var rig = FindTestCamera();
 
@@ -1372,6 +1400,14 @@ namespace Terrain2D.EditorTools
 
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
+
+            // 「按 Play 一片蓝」的头号原因不是渲染坏了，是镜头压根没照到地形 ——
+            // 地形可以离原点很远，而主相机默认停在原点、正交尺寸 5。
+            // 给一个一键框住的入口，比让人自己去 Game 视图里比划半天靠谱。
+            if (GUILayout.Button("对准地形", EditorStyles.miniButton))
+            {
+                Terrain2DMenuItems.FrameTerrain(ResolveCamera(), terrain);
+            }
 
             if (rig == null)
             {
@@ -2215,6 +2251,64 @@ namespace Terrain2D.EditorTools
             SceneView.RepaintAll();
 
             return rig;
+        }
+
+        /// <summary>
+        /// 把相机的视野框到一块地形上：位置取网格包围盒中心，正交尺寸按包围盒和画面比例算。
+        ///
+        /// 为什么需要这个：地形的世界坐标可以离原点很远 —— 现在这一关的九块地形全在
+        /// y ≈ -18 ~ -7，而 Main Camera 默认停在 (0, 0, -10)、正交尺寸 5，
+        /// 视野只有 y ∈ [-5, 5]。直接按 Play 就是满屏背景色，看着像"渲染坏了"，
+        /// 其实是镜头没照到东西。Scene 视图能看到地形，是因为 Scene 视图的镜头是自由的。
+        ///
+        /// 只改 X/Y 和正交尺寸，**不动 Z**：2D 靠 Z 分层，把镜头拽到地形所在的
+        /// 平面上会连近裁面都跨过去，比不框还糟。
+        /// </summary>
+        public static void FrameTerrain(Camera cam, HeightmapTerrain2D terrain)
+        {
+            if (cam == null || terrain == null) return;
+
+            var meshRenderer = terrain.GetComponent<MeshRenderer>();
+            if (meshRenderer == null) return;
+
+            Bounds bounds = meshRenderer.bounds;
+
+            // 网格还没生成（或者地形被拖成了一条线）时框了也没意义。
+            if (bounds.size.x < 0.001f && bounds.size.y < 0.001f) return;
+
+            Undo.RecordObject(cam.transform, "对准地形");
+            Undo.RecordObject(cam, "对准地形");
+
+            // 用 cam.aspect 而不是固定 16:9 —— 编辑器里它给的就是 Game 视图当前比例，
+            // 也就是按 Play 之后真正看到的那个画面。
+            float aspect = cam.aspect > 0.01f ? cam.aspect : 16f / 9f;
+
+            // 横向需要的半高 = 半宽 ÷ 比例。和纵向半高取大的那个才装得下，
+            // 否则宽地形会被左右切掉。
+            float fitHeight = bounds.extents.y;
+            float fitWidth = bounds.extents.x / aspect;
+
+            // 留 8% 边距，免得地形贴着画面上下沿，看着像被裁了。
+            cam.orthographic = true;
+            cam.orthographicSize = Mathf.Max(0.5f, Mathf.Max(fitHeight, fitWidth) * 1.08f);
+
+            cam.transform.position = new Vector3(
+                bounds.center.x, bounds.center.y, cam.transform.position.z);
+
+            // 相机上有跟随组件时，锁定点必须跟着更新。
+            // 不然「仅水平 / 仅垂直 / 固定」这几种模式按下 Play 会跳回框之前的位置，
+            // 刚对准的地形又跑出画面 —— 表现得像按钮没生效。
+            var rig = cam.GetComponent<TestCamera2D>();
+            if (rig != null)
+            {
+                Undo.RecordObject(rig, "对准地形");
+                rig.CaptureLock();
+                EditorUtility.SetDirty(rig);
+            }
+
+            EditorUtility.SetDirty(cam);
+            EditorUtility.SetDirty(cam.transform);
+            SceneView.RepaintAll();
         }
 
         /// <summary>
