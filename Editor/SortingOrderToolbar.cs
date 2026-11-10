@@ -16,6 +16,10 @@ namespace Terrain2D.EditorTools
     /// Objects carrying a HeightmapTerrain2D are skipped, and the whole toolbar stays hidden
     /// while one is selected: the terrain editor draws its own toolbar in the same spot and
     /// two stacked toolbars would fight for space.
+    ///
+    /// With nothing selected it draws a start bar instead — the stage selector plus the one
+    /// action that stage needs first. The two bars are mutually exclusive, which is why the
+    /// stage state lives in TerrainStage rather than on either of them.
     /// </summary>
     [InitializeOnLoad]
     internal static class SortingOrderToolbar
@@ -31,8 +35,9 @@ namespace Terrain2D.EditorTools
         // object has no renderer" want different behaviour.
         static bool _selectionEmpty = true;
 
-        // Must match the [MenuItem] path in Terrain2DToolsEditor exactly.
+        // Must match the [MenuItem] paths in Terrain2DToolsEditor exactly.
         const string CreateTerrainMenu = "GameObject/地形 2D/创建高度场地形";
+        const string CreatePlayerMenu = "GameObject/地形 2D/创建测试角色";
 
         static SortingOrderToolbar()
         {
@@ -56,9 +61,9 @@ namespace Terrain2D.EditorTools
 
             if (!CollectSelection())
             {
-                // Nothing selected at all: offer the one thing you always need first.
-                // A selection that merely has no renderer on it stays quiet — a "create a
-                // terrain" prompt there would just be noise.
+                // Nothing selected at all: the stage selector plus the one thing that
+                // stage needs first. A selection that merely has no renderer on it stays
+                // quiet — a "create a terrain" prompt there would just be noise.
                 if (_selectionEmpty) DrawStartToolbar(view);
                 return;
             }
@@ -84,18 +89,46 @@ namespace Terrain2D.EditorTools
 
             GUILayout.Label("关卡设计", EditorStyles.miniBoldLabel);
 
-            if (GUILayout.Button("创建高度场地形", EditorStyles.miniButton, GUILayout.Width(112f)))
+            // 阶段选择器在这里也要有。它表示"这块关卡走到哪一步"，和有没有选中物体
+            // 无关 —— 取消选择就看不到阶段，等于每换个操作对象就要重新确认一次进度。
+            if (TerrainStage.DrawSelector())
+                SceneView.RepaintAll();
+
+            GUILayout.Space(8f);
+
+            // 每个阶段"什么都没选的时候最想做的第一件事"。
+            switch (TerrainStage.Current)
             {
-                // 走菜单路径而不是直接调 HeightmapTerrain2DEditor.CreateTerrain()：
-                // 后者让两个文件产生编译期依赖，而 Unity 的增量编译不止一次出现
-                // "先编译、后导入"，于是报 'does not contain a definition'。
-                // 字符串调用没有这个问题。
-                EditorApplication.ExecuteMenuItem(CreateTerrainMenu);
+                case WorkStage.Test:
+                    if (GUILayout.Button("创建测试角色", EditorStyles.miniButton, GUILayout.Width(112f)))
+                        EditorApplication.ExecuteMenuItem(CreatePlayerMenu);
+                    break;
+
+                case WorkStage.Asset:
+                    // 资产替换阶段没有"凭空造一个东西"的动作 —— 它的起点是选中一块
+                    // 已经搭好的地形，所以这里只能给一句提示。
+                    GUILayout.Label("选中地形后，这里显示 UV 与材质", EditorStyles.miniLabel);
+                    break;
+
+                default:
+                    if (GUILayout.Button("创建高度场地形", EditorStyles.miniButton, GUILayout.Width(112f)))
+                    {
+                        // 走菜单路径而不是直接调 HeightmapTerrain2DEditor.CreateTerrain()：
+                        // 后者让两个文件产生编译期依赖，而 Unity 的增量编译不止一次出现
+                        // "先编译、后导入"，于是报 'does not contain a definition'。
+                        // 字符串调用没有这个问题。
+                        EditorApplication.ExecuteMenuItem(CreateTerrainMenu);
+                    }
+                    break;
             }
 
             GUILayout.FlexibleSpace();
 
-            GUILayout.Label("选中物体后这里会显示层级和颜色", EditorStyles.miniLabel);
+            string hint = TerrainStage.Current == WorkStage.Asset
+                ? string.Empty
+                : "选中地形后这里会显示" + TerrainStage.Labels[(int)TerrainStage.Current] + "工具";
+
+            if (hint.Length > 0) GUILayout.Label(hint, EditorStyles.miniLabel);
 
             GUILayout.EndHorizontal();
             GUILayout.EndVertical();

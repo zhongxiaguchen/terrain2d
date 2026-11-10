@@ -346,7 +346,14 @@ namespace Terrain2D.EditorTools
             if (count < 2) return;
 
             bool editing = IsEditing(terrain);
-            if (!editing && !terrain.showSceneHandles && !terrain.showUVGrid) return;
+
+            // 控制点全关的时候也只收控制点，不能把工具栏一起收走 ——
+            // 阶段选择器是入口，收起来就找不回来了（而退出编辑模式是个很平常的动作）。
+            if (!editing && !terrain.showSceneHandles && !terrain.showUVGrid)
+            {
+                DrawSceneToolbar(terrain);
+                return;
+            }
 
             Transform tr = terrain.transform;
             Event e = Event.current;
@@ -615,7 +622,9 @@ namespace Terrain2D.EditorTools
                 }
             }
 
-            if (editing) DrawSceneToolbar(terrain);
+            // 走到这里说明控制点至少画了一种，工具栏无条件画 —— 上面那个分支已经把
+            // "什么都不画"的情况提前返回了。
+            DrawSceneToolbar(terrain);
         }
 
         /// <summary>画一个可拖动的圆点，返回它到鼠标的屏幕距离。</summary>
@@ -735,50 +744,13 @@ namespace Terrain2D.EditorTools
         static string ToolbarKey(int instanceId) => "Terrain2D.Toolbar." + instanceId;
 
         // ------------------------------------------------------------------ 阶段
-
-        /// <summary>
-        /// 关卡制作的三段路。工具栏按阶段切换 —— 三个阶段的关注点完全不同，
-        /// 把所有按钮平铺在一起，每次都得从头找一遍。
-        /// </summary>
-        enum WorkStage
-        {
-            /// <summary>搭建：改形状、定分层。灰盒阶段。</summary>
-            Blockout = 0,
-
-            /// <summary>测试：验证碰撞和跳跃距离。</summary>
-            Test = 1,
-
-            /// <summary>资产替换：UV、材质、交给美术。</summary>
-            Asset = 2,
-        }
-
-        /// <summary>顺序必须和 <see cref="WorkStage"/> 一致。</summary>
-        static readonly string[] StageLabels = { "搭建", "测试", "资产替换" };
+        //
+        // 阶段枚举、状态和选择器的画法都在 TerrainStage.cs 里。原因见那边：
+        // 视口底部有两条互斥的工具栏（选中地形一条、什么都没选一条），两条都要
+        // 显示阶段，而阶段只有一个值，所以它不能挂在任何一个 Editor 实例上。
 
         /// <summary>顺序必须和 HeightmapTerrain2D.UVMode 一致。</summary>
         static readonly string[] UvModeLabels = { "平面映射", "沿曲面平铺" };
-
-        const string StageKey = "Terrain2D.Stage";
-
-        /// <summary>
-        /// 当前阶段是**全局**的，不是每个地形一份 —— 阶段是"这块关卡走到哪一步了"，
-        /// 不是某个物体的属性。场景里放了三块地形，选中哪块都不该把阶段重置。
-        ///
-        /// 存 EditorPrefs 而不是 SessionState：这个东西要跨 Editor 重启活着。
-        /// 早上打开工程不该重新选一次"我在做资产替换"。
-        /// </summary>
-        static WorkStage Stage
-        {
-            get
-            {
-                int raw = EditorPrefs.GetInt(StageKey, (int)WorkStage.Blockout);
-                return (WorkStage)Mathf.Clamp(raw, 0, StageLabels.Length - 1);
-            }
-            set
-            {
-                EditorPrefs.SetInt(StageKey, Mathf.Clamp((int)value, 0, StageLabels.Length - 1));
-            }
-        }
 
         // ------------------------------------------------------------------ 工具栏
 
@@ -815,7 +787,7 @@ namespace Terrain2D.EditorTools
 
             if (open)
             {
-                switch (Stage)
+                switch (TerrainStage.Current)
                 {
                     case WorkStage.Test:
                         DrawTestRows(terrain);
@@ -869,16 +841,8 @@ namespace Terrain2D.EditorTools
 
             GUILayout.Label("地形工具", EditorStyles.miniBoldLabel);
 
-            // 单选，所以用 Toolbar 而不是三个 Toggle —— Toolbar 天然表达"只能选一个"。
-            int picked = GUILayout.Toolbar(
-                (int)Stage, StageLabels, EditorStyles.miniButton,
-                GUILayout.Width(170f), GUILayout.Height(18f));
-
-            if (picked != (int)Stage)
-            {
-                Stage = (WorkStage)picked;
+            if (TerrainStage.DrawSelector())
                 SceneView.RepaintAll();
-            }
 
             GUILayout.FlexibleSpace();
 
@@ -890,7 +854,7 @@ namespace Terrain2D.EditorTools
         /// <summary>阶段相关的关键数字，放在第一行右侧。只显示这个阶段真正要看的数。</summary>
         string StageSummary(HeightmapTerrain2D terrain)
         {
-            switch (Stage)
+            switch (TerrainStage.Current)
             {
                 case WorkStage.Test:
                 {
