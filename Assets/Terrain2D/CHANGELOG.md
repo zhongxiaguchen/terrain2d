@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-10
+
+### Changed
+
+- **The viewport is now two fixed corners instead of one bottom bar.**
+  - **左下角 · 固定栏** holds nothing but 关卡设计 + the 搭建 / 测试 / 资产替换
+    selector. It is always there, because the stage describes how far the level has got,
+    not what is selected.
+  - **左上角 · 阶段面板** holds that stage's actual tools, and the stage selector is
+    deliberately *not* in it — the panel's contents change with the selection, and the
+    stage must not. The panel opens with a fold arrow and the stage name, since the
+    selector now sits in the opposite corner.
+- The panel is laid out for a 280px column (one or two controls per row) instead of four
+  full-width rows, so it can sit in the corner without covering the level. Long hints
+  moved from the right edge of each row into wrapped notes at the bottom.
+- **层级 / Z / 颜色 / 碰撞体 moved from the bottom bar to the top-left panel.** They are
+  properties of the selected object, not of the stage, so they show whenever a non-terrain
+  2D renderer is selected.
+- Panel fold state is global (`SessionState` `Terrain2D.PanelOpen`) rather than per object —
+  the panel follows the stage, so per-object folding meant it changed shape when you picked
+  a different terrain.
+- `SceneToolbarLayout.PanelWidth` is shared by both drawers of the panel, so switching
+  selection does not make the panel jump width.
+
+### Fixed
+
+- The panel is no longer clipped by an unknown-height area: it is anchored to the top-left
+  corner and given a fixed generous height, instead of being pushed to the bottom with
+  `FlexibleSpace`.
+
 ## [0.3.1] - 2026-11-10
 
 ### Added
@@ -215,6 +245,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Verified on Unity 2022.3.53f1 with URP 14 (2D Renderer).
 
 [Unreleased]: https://github.com/CHANGE_ME/terrain2d/commits/main
+[0.4.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/CHANGE_ME/terrain2d/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.1.1...v0.2.0

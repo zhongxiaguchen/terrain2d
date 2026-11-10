@@ -129,10 +129,10 @@ namespace Terrain2D.EditorTools
         /// 注意：这里用的是 SessionState —— 它只在本次 Editor 会话内有效，Unity 一重启
         /// （包括崩溃后重启、切版本、关掉再开）就会全部清空，而 key 又绑在 instanceID 上，
         /// 重启后 instanceID 也变了。如果默认值是 false，重启后编辑模式静默关闭，
-        /// Scene 视图底部那条工具栏就整个消失，看起来像"脚本文件丢了"，实际只是这个开关。
+        /// Scene 视图里的控制点就全不见了，看起来像"地形坏了"，实际只是这个开关。
         ///
-        /// 所以默认给 true：选中地形物体就应该能直接看到工具栏。
-        /// 想临时收起来，用 Inspector 里的「退出编辑模式」按钮。
+        /// 所以默认给 true。它只控制**画不画控制点** —— 左上角那块阶段面板
+        /// 和编辑模式无关，任何时候都在。
         /// </summary>
         static bool IsEditing(HeightmapTerrain2D terrain)
         {
@@ -347,11 +347,11 @@ namespace Terrain2D.EditorTools
 
             bool editing = IsEditing(terrain);
 
-            // 控制点全关的时候也只收控制点，不能把工具栏一起收走 ——
-            // 阶段选择器是入口，收起来就找不回来了（而退出编辑模式是个很平常的动作）。
+            // 控制点全关的时候也只收控制点，不能把面板一起收走 ——
+            // 退出编辑模式是个很平常的动作，面板不该跟着消失。
             if (!editing && !terrain.showSceneHandles && !terrain.showUVGrid)
             {
-                DrawSceneToolbar(terrain);
+                DrawStagePanel(terrain);
                 return;
             }
 
@@ -622,9 +622,9 @@ namespace Terrain2D.EditorTools
                 }
             }
 
-            // 走到这里说明控制点至少画了一种，工具栏无条件画 —— 上面那个分支已经把
+            // 走到这里说明控制点至少画了一种，面板无条件画 —— 上面那个分支已经把
             // "什么都不画"的情况提前返回了。
-            DrawSceneToolbar(terrain);
+            DrawStagePanel(terrain);
         }
 
         /// <summary>画一个可拖动的圆点，返回它到鼠标的屏幕距离。</summary>
@@ -741,52 +741,74 @@ namespace Terrain2D.EditorTools
         static GUIStyle _warnStyle;
         static GUIStyle _hintStyle;
 
-        static string ToolbarKey(int instanceId) => "Terrain2D.Toolbar." + instanceId;
-
         // ------------------------------------------------------------------ 阶段
-        //
-        // 阶段枚举、状态和选择器的画法都在 TerrainStage.cs 里。原因见那边：
-        // 视口底部有两条互斥的工具栏（选中地形一条、什么都没选一条），两条都要
-        // 显示阶段，而阶段只有一个值，所以它不能挂在任何一个 Editor 实例上。
 
         /// <summary>顺序必须和 HeightmapTerrain2D.UVMode 一致。</summary>
         static readonly string[] UvModeLabels = { "平面映射", "沿曲面平铺" };
 
-        // ------------------------------------------------------------------ 工具栏
+        // ------------------------------------------------------------------ 阶段面板
+
+        const string PanelOpenKey = "Terrain2D.PanelOpen";
 
         /// <summary>
-        /// 视口底部的横排工具栏，仿 Unity 粒子特效那个：贴底、横排、左边有个折叠箭头。
-        ///
-        /// 结构是「外壳 + 按阶段分发」：外壳只负责定位、折叠、阶段选择，
-        /// 具体几行内容交给 DrawBlockoutRows / DrawTestRows / DrawAssetRows。
-        /// 以后加第四个阶段只需要多一个 case，不用碰外壳。
+        /// 折叠状态是**全局**的：面板跟着阶段走，不跟着物体走。
+        /// 以前按 instanceId 存在 SessionState 里，换一块地形选就换一种折叠状态，很怪。
         /// </summary>
-        void DrawSceneToolbar(HeightmapTerrain2D terrain)
+        static bool PanelOpen
+        {
+            get { return SessionState.GetBool(PanelOpenKey, true); }
+            set { SessionState.SetBool(PanelOpenKey, value); }
+        }
+
+        static GUIStyle _noteStyle;
+
+        /// <summary>
+        /// 左上角的浮动面板，显示**当前阶段**的工具。
+        ///
+        /// 阶段选择器**不在**这里 —— 它在视口左下角那条固定栏上，由
+        /// SortingOrderToolbar 画。分开的理由是两者的生命周期不同：
+        /// 阶段是全局状态，一直在；这里的控件只对"选中的这块地形"有意义，
+        /// 换掉选择就该换掉内容。
+        /// </summary>
+        void DrawStagePanel(HeightmapTerrain2D terrain)
         {
             var view = SceneView.currentDrawingSceneView;
             if (view == null) return;
 
-            int id = terrain.GetInstanceID();
-            bool open = SessionState.GetBool(ToolbarKey(id), true);
-
-            Rect viewRect = view.position;
+            Rect rect = SceneToolbarLayout.Panel(view.position, SceneToolbarLayout.PanelWidth);
 
             Handles.BeginGUI();
-
-            // 用一个覆盖整个视口的透明区域 + FlexibleSpace 把内容顶到底部。
-            // 这样不用去猜"Scene 视图工具栏有多高"，位置永远是贴底的。
-            GUILayout.BeginArea(SceneToolbarLayout.Area(viewRect, 112f));
-            GUILayout.FlexibleSpace();
-
-            // 轮廓自交的警告贴在工具栏正上方 —— 正在拖点的人一眼就能看到。
-            if (!terrain.OutlineValid) DrawOutlineWarning();
+            GUILayout.BeginArea(rect);
 
             GUILayout.BeginVertical("box");
 
-            DrawStageBar(terrain, id, ref open);
+            bool open = PanelOpen;
+
+            GUILayout.BeginHorizontal();
+
+            if (GUILayout.Button(open ? "▾" : "▸", EditorStyles.miniButton, GUILayout.Width(18f)))
+            {
+                open = !open;
+                PanelOpen = open;
+                SceneView.RepaintAll();
+            }
+
+            // 阶段名必须写在面板里：选择器在视口另一端，收起来之后光看内容
+            // 分不清现在是哪个阶段。
+            GUILayout.Label(TerrainStage.Labels[(int)TerrainStage.Current],
+                            EditorStyles.miniBoldLabel);
+
+            GUILayout.FlexibleSpace();
+
+            GUILayout.Label(StageSummary(terrain), EditorStyles.miniLabel);
+
+            GUILayout.EndHorizontal();
 
             if (open)
             {
+                // 轮廓自交的警告贴在最上面 —— 正在拖点的人一眼就能看到。
+                if (!terrain.OutlineValid) DrawOutlineWarning();
+
                 switch (TerrainStage.Current)
                 {
                     case WorkStage.Test:
@@ -805,8 +827,22 @@ namespace Terrain2D.EditorTools
 
             GUILayout.EndVertical();
             GUILayout.EndArea();
-
             Handles.EndGUI();
+        }
+
+        /// <summary>窄面板里放得下的换行小字。miniLabel 默认不换行，长句会被直接裁掉。</summary>
+        static GUIStyle NoteStyle
+        {
+            get
+            {
+                if (_noteStyle == null)
+                {
+                    _noteStyle = new GUIStyle(EditorStyles.miniLabel);
+                    _noteStyle.wordWrap = true;
+                }
+
+                return _noteStyle;
+            }
         }
 
         void DrawOutlineWarning()
@@ -815,72 +851,38 @@ namespace Terrain2D.EditorTools
             {
                 _warnStyle = new GUIStyle(EditorStyles.boldLabel);
                 _warnStyle.normal.textColor = new Color(1f, 0.48f, 0.38f);
+                _warnStyle.wordWrap = true;
             }
 
             GUILayout.BeginVertical("box");
             GUILayout.Label("轮廓自交 —— 网格已停止更新", _warnStyle);
             GUILayout.Label("把越界的控制点拖回来即可恢复，或点 Inspector 里的「清空边加点」。",
-                            EditorStyles.miniLabel);
+                            NoteStyle);
             GUILayout.EndVertical();
         }
 
-        /// <summary>
-        /// 第一行：折叠箭头 + 阶段选择 + 当前阶段的关键数字。
-        /// 这一行**折叠时也显示** —— 它是入口，收起来就找不回来了。
-        /// </summary>
-        void DrawStageBar(HeightmapTerrain2D terrain, int id, ref bool open)
-        {
-            GUILayout.BeginHorizontal();
-
-            if (GUILayout.Button(open ? "▾" : "▸", EditorStyles.miniButton, GUILayout.Width(20f)))
-            {
-                open = !open;
-                SessionState.SetBool(ToolbarKey(id), open);
-                SceneView.RepaintAll();
-            }
-
-            GUILayout.Label("地形工具", EditorStyles.miniBoldLabel);
-
-            if (TerrainStage.DrawSelector())
-                SceneView.RepaintAll();
-
-            GUILayout.FlexibleSpace();
-
-            GUILayout.Label(StageSummary(terrain), EditorStyles.miniLabel);
-
-            GUILayout.EndHorizontal();
-        }
-
-        /// <summary>阶段相关的关键数字，放在第一行右侧。只显示这个阶段真正要看的数。</summary>
+        /// <summary>标题行右侧的关键数字。窄面板放不下长句子，只留一个数。</summary>
         string StageSummary(HeightmapTerrain2D terrain)
         {
             switch (TerrainStage.Current)
             {
                 case WorkStage.Test:
-                {
-                    var player = FindTestPlayer();
-                    return (terrain.buildColliders ? "碰撞 开" : "碰撞 关") +
-                           "　测试角色 " + (player != null ? "有" : "无");
-                }
+                    return terrain.buildColliders ? "碰撞 开" : "碰撞 关";
 
                 case WorkStage.Asset:
                 {
                     var filter = terrain.GetComponent<MeshFilter>();
                     var mesh = filter != null ? filter.sharedMesh : null;
 
-                    if (mesh == null) return "网格未生成";
+                    if (mesh == null) return "未生成";
 
-                    // 用 GetIndexCount 而不是 mesh.triangles —— 后者每次都拷一份新数组，
-                    // 而这一行每次重绘都会跑到。返回类型在不同版本间是 int / uint，
-                    // 显式转一下，两边都能编。
-                    return "顶点 " + mesh.vertexCount +
-                           "　三角 " + ((int)mesh.GetIndexCount(0) / 3);
+                    // 用 vertexCount 而不是 mesh.triangles —— 后者每次都拷一份新数组，
+                    // 而这一行每次重绘都会跑到。
+                    return mesh.vertexCount + " 顶点";
                 }
 
                 default:
-                    return "地表 " + terrain.sampleCount +
-                           "　左 " + terrain.LeftEdge.Count +
-                           "　右 " + terrain.RightEdge.Count;
+                    return "地表 " + terrain.sampleCount;
             }
         }
 
@@ -888,14 +890,14 @@ namespace Terrain2D.EditorTools
 
         void DrawBlockoutRows(HeightmapTerrain2D terrain)
         {
-            // ---- 外观与编辑辅助 ----
+            // ---- 外观 ----
             GUILayout.BeginHorizontal();
 
             GUILayout.Label("颜色", EditorStyles.miniLabel);
 
             EditorGUI.BeginChangeCheck();
             Color picked = EditorGUILayout.ColorField(
-                GUIContent.none, terrain.color, true, true, false, GUILayout.Width(70f));
+                GUIContent.none, terrain.color, true, true, false, GUILayout.Width(64f));
 
             if (EditorGUI.EndChangeCheck())
             {
@@ -906,8 +908,8 @@ namespace Terrain2D.EditorTools
                 Repaint();
             }
 
-            // 和「任意 2D 物体」那条工具栏用同一个调色板。
-            if (GUILayout.Button("▾", EditorStyles.miniButton, GUILayout.Width(20f)))
+            // 和「任意 2D 物体」那条栏用同一个调色板。
+            if (GUILayout.Button("▾", EditorStyles.miniButton, GUILayout.Width(18f)))
             {
                 ColorPalette.ShowMenu(terrain.color, chosen =>
                 {
@@ -919,9 +921,15 @@ namespace Terrain2D.EditorTools
                 });
             }
 
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            // ---- 编辑辅助 ----
+            GUILayout.BeginHorizontal();
+
             bool boundary = GUILayout.Toggle(
                 terrain.showBoundaryHandles, "边界方块",
-                EditorStyles.miniButton, GUILayout.Width(68f));
+                EditorStyles.miniButton, GUILayout.Width(64f));
 
             if (boundary != terrain.showBoundaryHandles)
             {
@@ -934,7 +942,7 @@ namespace Terrain2D.EditorTools
 
             bool smooth = GUILayout.Toggle(
                 terrain.smoothDrag, "平滑拖动",
-                EditorStyles.miniButton, GUILayout.Width(68f));
+                EditorStyles.miniButton, GUILayout.Width(64f));
 
             if (smooth != terrain.smoothDrag)
             {
@@ -945,10 +953,6 @@ namespace Terrain2D.EditorTools
             }
 
             GUILayout.FlexibleSpace();
-
-            GUILayout.Label("拖蓝点改地表　Shift+点边加点　Ctrl/Cmd+点圆点删点",
-                            EditorStyles.miniLabel);
-
             GUILayout.EndHorizontal();
 
             // ---- 分层 ----
@@ -966,37 +970,52 @@ namespace Terrain2D.EditorTools
             if (GUILayout.Button("重建", EditorStyles.miniButton, GUILayout.Width(46f)))
                 RunAction(terrain, "重建地形", terrain.Rebuild);
 
-            GUILayout.Space(10f);
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
 
-            if (GUILayout.Button("细分 ×2", EditorStyles.miniButton, GUILayout.Width(58f)))
+            GUILayout.BeginHorizontal();
+
+            if (GUILayout.Button("细分 ×2", EditorStyles.miniButton, GUILayout.Width(62f)))
                 RunAction(terrain, "细分地形", terrain.Subdivide);
 
-            if (GUILayout.Button("简化一半", EditorStyles.miniButton, GUILayout.Width(58f)))
+            if (GUILayout.Button("简化一半", EditorStyles.miniButton, GUILayout.Width(62f)))
                 RunAction(terrain, "简化地形", terrain.Simplify);
 
-            if (GUILayout.Button("清空边加点", EditorStyles.miniButton, GUILayout.Width(74f)))
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+
+            if (GUILayout.Button("清空边加点", EditorStyles.miniButton, GUILayout.Width(78f)))
                 RunAction(terrain, "清空边加点", terrain.ClearEdgePoints);
 
-            if (GUILayout.Button("清空横向", EditorStyles.miniButton, GUILayout.Width(62f)))
+            if (GUILayout.Button("清空横向", EditorStyles.miniButton, GUILayout.Width(66f)))
                 RunAction(terrain, "清空横向偏移", terrain.ClearXOffsets);
 
             GUILayout.FlexibleSpace();
-
             GUILayout.EndHorizontal();
 
             // ---- 颜色图例 ----
             GUILayout.BeginHorizontal();
 
             Chip(TopColor, "地表");
-            Chip(BottomColor, "底部轮廓");
-            Chip(EdgePointColor, "左右边");
-            GUILayout.Space(10f);
+            Chip(BottomColor, "底部");
+            Chip(EdgePointColor, "边点");
+
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+
             Chip(EdgeColor, "移边界");
             Chip(SlantColor, "边变斜");
             if (terrain.useBottomProfile) Chip(SlantColor, "底边逐点");
             else Chip(BottomEdgeColor, "底边整体");
 
+            GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
+
+            GUILayout.Label("拖圆点改地表　Shift+点边加点　Ctrl/Cmd+点圆点删点", NoteStyle);
         }
 
         /// <summary>
@@ -1011,7 +1030,7 @@ namespace Terrain2D.EditorTools
             GUILayout.Label("层级", EditorStyles.miniLabel);
 
             EditorGUI.BeginChangeCheck();
-            int sortingOrder = EditorGUILayout.IntField(terrain.sortingOrder, GUILayout.Width(48f));
+            int sortingOrder = EditorGUILayout.IntField(terrain.sortingOrder, GUILayout.Width(44f));
 
             if (EditorGUI.EndChangeCheck())
             {
@@ -1022,14 +1041,15 @@ namespace Terrain2D.EditorTools
                 SceneView.RepaintAll();
             }
 
+            GUILayout.Space(8f);
+
             // Z：前景 / 背景分层用。层级相同时 Unity 就是靠 Z 决定谁在前，
             // 所以它和 sortingOrder 是一套东西的两半。
-            GUILayout.Space(10f);
             GUILayout.Label("Z", EditorStyles.miniLabel);
 
             EditorGUI.BeginChangeCheck();
             float depth = EditorGUILayout.FloatField(
-                terrain.transform.position.z, GUILayout.Width(56f));
+                terrain.transform.position.z, GUILayout.Width(48f));
 
             if (EditorGUI.EndChangeCheck())
             {
@@ -1041,8 +1061,8 @@ namespace Terrain2D.EditorTools
                 SceneView.RepaintAll();
             }
 
-            // 和「任意 2D 物体」那条工具栏用同一套 Z 预设。
-            if (GUILayout.Button("▾", EditorStyles.miniButton, GUILayout.Width(20f)))
+            // 和「任意 2D 物体」那条栏用同一套 Z 预设。
+            if (GUILayout.Button("▾", EditorStyles.miniButton, GUILayout.Width(18f)))
             {
                 DepthPresets.ShowMenu(terrain.transform.position.z, chosen =>
                 {
@@ -1055,13 +1075,16 @@ namespace Terrain2D.EditorTools
                 });
             }
 
-            GUILayout.Space(12f);
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
 
             DrawColliderToggle(terrain);
 
             GUILayout.FlexibleSpace();
 
-            GUILayout.Label("层级大的盖上面　Z 小的靠前", EditorStyles.miniLabel);
+            GUILayout.Label("层级大在上　Z 小在前", EditorStyles.miniLabel);
 
             GUILayout.EndHorizontal();
         }
@@ -1112,7 +1135,7 @@ namespace Terrain2D.EditorTools
         {
             var player = FindTestPlayer();
 
-            // ---- 角色 + 碰撞体 ----
+            // ---- 角色 ----
             GUILayout.BeginHorizontal();
 
             if (GUILayout.Button(player != null ? "选中角色" : "创建测试角色",
@@ -1128,7 +1151,7 @@ namespace Terrain2D.EditorTools
                     // 创建后立刻摆到地形左端 —— 刚造出来放在视口中心的话多半悬在半空，
                     // 还得自己拖过去。
                     //
-                    // select 传 false：选中新物体会让这块地形的工具栏立刻消失
+                    // select 传 false：选中新物体会让这块地形的面板立刻消失
                     // （OnSceneGUI 只画在选中物体上），点一下按钮工具没了很突兀。
                     // 改用 PingObject 闪一下 Hierarchy，位置留在原地。
                     var created = Terrain2DMenuItems.BuildTestPlayer(null, false);
@@ -1147,66 +1170,50 @@ namespace Terrain2D.EditorTools
                     MovePlayerToStart(terrain, player);
             }
 
-            GUILayout.Space(10f);
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            // ---- 碰撞体 ----
+            GUILayout.BeginHorizontal();
 
             DrawColliderToggle(terrain);
 
             GUILayout.FlexibleSpace();
 
-            GUILayout.Label("按 Play 试跳，边跑边调下面的数", EditorStyles.miniLabel);
+            GUILayout.Label("按 Play 试跳", EditorStyles.miniLabel);
 
             GUILayout.EndHorizontal();
 
-            // ---- 手感参数 ----
-            GUILayout.BeginHorizontal();
-
+            // ---- 手感参数：直接写 TestPlayer2D 的字段，Play 中拖动立刻生效 ----
             if (player != null)
             {
-                GUILayout.Label("跳跃高度", EditorStyles.miniLabel);
-
-                float jump = Slider(player.jumpHeight, 0.5f, 8f, 110f, "0.00");
-
-                if (!Mathf.Approximately(jump, player.jumpHeight))
+                DrawPlayerSlider("跳跃高度", player.jumpHeight, 0.5f, 8f, "0.00", value =>
                 {
                     Undo.RecordObject(player, "改跳跃高度");
-                    player.jumpHeight = jump;
+                    player.jumpHeight = value;
                     EditorUtility.SetDirty(player);
-                }
+                });
 
-                GUILayout.Space(12f);
-                GUILayout.Label("移动速度", EditorStyles.miniLabel);
-
-                float speed = Slider(player.moveSpeed, 1f, 20f, 110f, "0.0");
-
-                if (!Mathf.Approximately(speed, player.moveSpeed))
+                DrawPlayerSlider("移动速度", player.moveSpeed, 1f, 20f, "0.0", value =>
                 {
                     Undo.RecordObject(player, "改移动速度");
-                    player.moveSpeed = speed;
+                    player.moveSpeed = value;
                     EditorUtility.SetDirty(player);
-                }
+                });
 
-                GUILayout.Space(12f);
-                GUILayout.Label("空中操控", EditorStyles.miniLabel);
-
-                float air = Slider(player.airControl, 0f, 1f, 80f, "0.00");
-
-                if (!Mathf.Approximately(air, player.airControl))
+                DrawPlayerSlider("空中操控", player.airControl, 0f, 1f, "0.00", value =>
                 {
                     Undo.RecordObject(player, "改空中操控");
-                    player.airControl = air;
+                    player.airControl = value;
                     EditorUtility.SetDirty(player);
-                }
+                });
             }
             else
             {
                 GUILayout.Label(
                     "场景里还没有测试角色。点「创建测试角色」，它自带占位方块，不需要美术资源。",
-                    EditorStyles.miniLabel);
+                    NoteStyle);
             }
-
-            GUILayout.FlexibleSpace();
-
-            GUILayout.EndHorizontal();
 
             // ---- 碰撞精度 ----
             GUILayout.BeginHorizontal();
@@ -1224,12 +1231,16 @@ namespace Terrain2D.EditorTools
                 MarkDirty(terrain);
             }
 
-            GUILayout.Space(10f);
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+
             GUILayout.Label("采样间隔", EditorStyles.miniLabel);
 
             EditorGUI.BeginChangeCheck();
             int stride = EditorGUILayout.IntSlider(
-                terrain.colliderStride, 1, 16, GUILayout.Width(100f));
+                terrain.colliderStride, 1, 16, GUILayout.Width(96f));
 
             if (EditorGUI.EndChangeCheck())
             {
@@ -1240,9 +1251,27 @@ namespace Terrain2D.EditorTools
             }
 
             GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
 
-            GUILayout.Label("碰撞边缘和视觉边缘对不上时调「碰撞偏移」", EditorStyles.miniLabel);
+            GUILayout.Label("碰撞边缘和视觉边缘对不上时调「碰撞偏移」", NoteStyle);
+        }
 
+        /// <summary>
+        /// 一行「标签 + 滑块 + 数值」。窄面板里每个手感参数占一行，比三个并排好读。
+        /// 值变了才回调，否则每帧都会 Undo.RecordObject。
+        /// </summary>
+        void DrawPlayerSlider(string label, float value, float min, float max,
+                              string format, System.Action<float> apply)
+        {
+            GUILayout.BeginHorizontal();
+
+            GUILayout.Label(label, EditorStyles.miniLabel);
+
+            float picked = Slider(value, min, max, 110f, format);
+
+            if (!Mathf.Approximately(picked, value)) apply(picked);
+
+            GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
         }
 
@@ -1288,7 +1317,7 @@ namespace Terrain2D.EditorTools
 
         void DrawAssetRows(HeightmapTerrain2D terrain)
         {
-            // ---- UV ----
+            // ---- UV 模式 ----
             GUILayout.BeginHorizontal();
 
             GUILayout.Label("UV", EditorStyles.miniLabel);
@@ -1305,11 +1334,16 @@ namespace Terrain2D.EditorTools
                 MarkDirty(terrain);
             }
 
-            GUILayout.Space(10f);
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            // ---- 缩放与网格 ----
+            GUILayout.BeginHorizontal();
+
             GUILayout.Label("缩放", EditorStyles.miniLabel);
 
             EditorGUI.BeginChangeCheck();
-            float uvScale = EditorGUILayout.FloatField(terrain.uvScale, GUILayout.Width(56f));
+            float uvScale = EditorGUILayout.FloatField(terrain.uvScale, GUILayout.Width(52f));
 
             if (EditorGUI.EndChangeCheck() && uvScale > 1e-4f)
             {
@@ -1318,8 +1352,6 @@ namespace Terrain2D.EditorTools
                 terrain.Rebuild();
                 MarkDirty(terrain);
             }
-
-            GUILayout.Space(10f);
 
             bool grid = GUILayout.Toggle(
                 terrain.showUVGrid, "显示 UV 网格", EditorStyles.miniButton, GUILayout.Width(92f));
@@ -1334,29 +1366,19 @@ namespace Terrain2D.EditorTools
             }
 
             GUILayout.FlexibleSpace();
-
-            GUILayout.Label("1 / 缩放 = 贴图重复一次的距离", EditorStyles.miniLabel);
-
             GUILayout.EndHorizontal();
 
-            // ---- 贴图要铺几次 ----
-            GUILayout.BeginHorizontal();
-
+            // ---- 读数 ----
             float repeat = terrain.SurfaceLength * terrain.uvScale;
 
             GUILayout.Label("地表总长 " + terrain.SurfaceLength.ToString("0.0") +
-                            "　贴图沿地表重复 " + repeat.ToString("0.0") + " 次",
-                            EditorStyles.miniLabel);
-
-            GUILayout.FlexibleSpace();
+                            "　重复 " + repeat.ToString("0.0") + " 次", EditorStyles.miniLabel);
 
             GUILayout.Label(
                 terrain.uvMode == HeightmapTerrain2D.UVMode.Planar
-                    ? "平面映射在斜坡上会把贴图拉长"
-                    : "弧长映射，斜坡上密度不变",
-                EditorStyles.miniLabel);
-
-            GUILayout.EndHorizontal();
+                    ? "平面映射在斜坡上会把贴图拉长（1/cos 坡角）。"
+                    : "弧长映射，斜坡上密度不变。",
+                NoteStyle);
 
             // ---- 材质 ----
             GUILayout.BeginHorizontal();
@@ -1372,8 +1394,6 @@ namespace Terrain2D.EditorTools
                 MarkDirty(terrain);
             }
 
-            GUILayout.Space(8f);
-
             var renderer = terrain.GetComponent<MeshRenderer>();
             var material = renderer != null ? renderer.sharedMaterial : null;
 
@@ -1383,21 +1403,20 @@ namespace Terrain2D.EditorTools
 
             using (new EditorGUI.DisabledScope(!embedded))
             {
-                if (GUILayout.Button("材质存为资产", EditorStyles.miniButton, GUILayout.Width(92f)))
+                if (GUILayout.Button("存为资产", EditorStyles.miniButton, GUILayout.Width(72f)))
                     SaveMaterialAsAsset(terrain, material);
             }
 
             GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
 
             GUILayout.Label(
                 material == null
                     ? "没有材质"
                     : embedded
-                        ? "材质是自动生成的内嵌材质，Project 里找不到"
+                        ? "内嵌材质，Project 里找不到"
                         : "材质：" + material.name,
-                EditorStyles.miniLabel);
-
-            GUILayout.EndHorizontal();
+                NoteStyle);
 
             // ---- 只在真有问题时才出现的警告 ----
             DrawAssetWarnings(terrain, embedded);

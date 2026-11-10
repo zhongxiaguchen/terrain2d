@@ -5,21 +5,22 @@ using UnityEngine;
 namespace Terrain2D.EditorTools
 {
     /// <summary>
-    /// A small 层级 (sorting order) field pinned to the bottom of the Scene view whenever the
-    /// selection contains 2D renderers.
+    /// Draws the two things that live outside the per-object editors: the fixed stage bar in
+    /// the bottom-left corner, and the top-left panel whenever a terrain is not selected.
     ///
-    /// Unity does expose "Order in Layer" in the Inspector for every renderer, but it sits in
-    /// the middle of the SpriteRenderer / MeshRenderer block — a long way from the object you
-    /// are actually looking at. This puts the one number you reach for while laying out a
-    /// level directly under the viewport, where the terrain tool's toolbar already lives.
+    /// 布局上只有两块地方，各有各的职责：
     ///
-    /// Objects carrying a HeightmapTerrain2D are skipped, and the whole toolbar stays hidden
-    /// while one is selected: the terrain editor draws its own toolbar in the same spot and
-    /// two stacked toolbars would fight for space.
+    ///   左下角  固定栏 —— 关卡设计 + 搭建 / 测试 / 资产替换。**永远在**，
+    ///           因为它说的是"这块关卡走到哪一步"，不是"当前选中了什么"。
+    ///   左上角  面板 —— 当前阶段具体要用的工具。内容随选择变：
+    ///           选中地形时由 HeightmapTerrain2DEditor 画（阶段工具），
+    ///           选中别的 2D 物体时由这里画（层级 / Z / 颜色），
+    ///           什么都没选时这里只放该阶段的第一个动作。
     ///
-    /// With nothing selected it draws a start bar instead — the stage selector plus the one
-    /// action that stage needs first. The two bars are mutually exclusive, which is why the
-    /// stage state lives in TerrainStage rather than on either of them.
+    /// 之所以把"层级"从 Inspector 搬出来：它藏在 SpriteRenderer / MeshRenderer 那一大块
+    /// 中间，离你正在看的物体很远，而摆关卡时这是最常改的一个数。
+    ///
+    /// 两块地方都只画在左上/左下，靠 CollectSelection 对地形让位来避免和地形面板重叠。
     /// </summary>
     [InitializeOnLoad]
     internal static class SortingOrderToolbar
@@ -38,6 +39,11 @@ namespace Terrain2D.EditorTools
         // Must match the [MenuItem] paths in Terrain2DToolsEditor exactly.
         const string CreateTerrainMenu = "GameObject/地形 2D/创建高度场地形";
         const string CreatePlayerMenu = "GameObject/地形 2D/创建测试角色";
+
+        // 固定栏只装标题 + 三段选择器，所以宽度是算出来的而不是撑满：
+        // 撑满会把整条视口底边都占掉，看着像条横幅。
+        const float StageBarWidth = 250f;
+        const float StageSelectorWidth = 170f;
 
         static SortingOrderToolbar()
         {
@@ -59,59 +65,80 @@ namespace Terrain2D.EditorTools
             if (view == null) return;
             if (Event.current == null) return;
 
-            if (!CollectSelection())
+            // 左下角固定栏先画，而且**无条件**画：阶段是"这块关卡走到哪一步"，
+            // 和选中什么无关，取消选择不该把它藏起来。
+            DrawStageBar(view);
+
+            if (CollectSelection())
             {
-                // Nothing selected at all: the stage selector plus the one thing that
-                // stage needs first. A selection that merely has no renderer on it stays
-                // quiet — a "create a terrain" prompt there would just be noise.
-                if (_selectionEmpty) DrawStartToolbar(view);
+                DrawSelectionPanel(view);
                 return;
             }
 
-            DrawSelectionToolbar(view);
+            // A selection that merely has no renderer on it stays quiet — a "create a
+            // terrain" prompt there would just be noise.
+            if (_selectionEmpty) DrawStageActionPanel(view);
         }
 
-        /// <summary>Shown when the selection is empty.</summary>
-        static void DrawStartToolbar(SceneView view)
+        /// <summary>
+        /// 左下角那条固定栏：标题 + 阶段选择器，就这两样。
+        ///
+        /// 故意做窄：它只回答"我在哪个阶段"，具体工具在左上角那块面板里。
+        /// 阶段选择器放这里而不是放面板里，是因为面板的内容会随选择变，
+        /// 而阶段不该跟着变。
+        /// </summary>
+        static void DrawStageBar(SceneView view)
         {
-            Rect viewRect = view.position;
-
-            // Same trick as everywhere else here: cover the viewport with a transparent area
-            // and push the content to the bottom with FlexibleSpace, so there is no need to
-            // know how tall the Scene view toolbar is. The bottom inset lives in
-            // SceneToolbarLayout so all three toolbars stay in the same place.
             Handles.BeginGUI();
-            GUILayout.BeginArea(SceneToolbarLayout.Area(viewRect, 60f));
+            GUILayout.BeginArea(SceneToolbarLayout.Area(view.position, 60f));
             GUILayout.FlexibleSpace();
 
-            GUILayout.BeginVertical("box");
+            GUILayout.BeginVertical("box", GUILayout.Width(StageBarWidth));
             GUILayout.BeginHorizontal();
 
             GUILayout.Label("关卡设计", EditorStyles.miniBoldLabel);
 
-            // 阶段选择器在这里也要有。它表示"这块关卡走到哪一步"，和有没有选中物体
-            // 无关 —— 取消选择就看不到阶段，等于每换个操作对象就要重新确认一次进度。
-            if (TerrainStage.DrawSelector())
+            if (TerrainStage.DrawSelector(StageSelectorWidth))
                 SceneView.RepaintAll();
 
-            GUILayout.Space(8f);
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
 
-            // 每个阶段"什么都没选的时候最想做的第一件事"。
+            GUILayout.EndArea();
+            Handles.EndGUI();
+        }
+
+        /// <summary>
+        /// 左上角面板：什么都没选的时候，只放当前阶段"最想做的第一件事"。
+        ///
+        /// 同一个位置在选中地形时由 HeightmapTerrain2DEditor 画完整工具，
+        /// 两者二选一 —— 靠 CollectSelection 对地形让位来保证不重叠。
+        /// </summary>
+        static void DrawStageActionPanel(SceneView view)
+        {
+            Handles.BeginGUI();
+            GUILayout.BeginArea(SceneToolbarLayout.Panel(view.position, SceneToolbarLayout.PanelWidth));
+            GUILayout.BeginVertical("box");
+
+            GUILayout.Label(TerrainStage.Labels[(int)TerrainStage.Current],
+                            EditorStyles.miniBoldLabel);
+
             switch (TerrainStage.Current)
             {
                 case WorkStage.Test:
-                    if (GUILayout.Button("创建测试角色", EditorStyles.miniButton, GUILayout.Width(112f)))
+                    if (GUILayout.Button("创建测试角色", EditorStyles.miniButton))
                         EditorApplication.ExecuteMenuItem(CreatePlayerMenu);
                     break;
 
                 case WorkStage.Asset:
                     // 资产替换阶段没有"凭空造一个东西"的动作 —— 它的起点是选中一块
                     // 已经搭好的地形，所以这里只能给一句提示。
-                    GUILayout.Label("选中地形后，这里显示 UV 与材质", EditorStyles.miniLabel);
+                    GUILayout.Label("选中地形后，这里显示 UV 与材质。",
+                                    EditorStyles.wordWrappedMiniLabel);
                     break;
 
                 default:
-                    if (GUILayout.Button("创建高度场地形", EditorStyles.miniButton, GUILayout.Width(112f)))
+                    if (GUILayout.Button("创建高度场地形", EditorStyles.miniButton))
                     {
                         // 走菜单路径而不是直接调 HeightmapTerrain2DEditor.CreateTerrain()：
                         // 后者让两个文件产生编译期依赖，而 Unity 的增量编译不止一次出现
@@ -122,80 +149,84 @@ namespace Terrain2D.EditorTools
                     break;
             }
 
-            GUILayout.FlexibleSpace();
-
-            string hint = TerrainStage.Current == WorkStage.Asset
-                ? string.Empty
-                : "选中地形后这里会显示" + TerrainStage.Labels[(int)TerrainStage.Current] + "工具";
-
-            if (hint.Length > 0) GUILayout.Label(hint, EditorStyles.miniLabel);
-
-            GUILayout.EndHorizontal();
             GUILayout.EndVertical();
-
             GUILayout.EndArea();
             Handles.EndGUI();
         }
 
-        static void DrawSelectionToolbar(SceneView view)
+        /// <summary>
+        /// 左上角面板：选中了非地形的 2D 物体。
+        /// 内容和阶段无关 —— 层级 / Z / 颜色是"这个物体"的属性，不是关卡进度。
+        /// </summary>
+        static void DrawSelectionPanel(SceneView view)
         {
-            Rect viewRect = view.position;
-
             Handles.BeginGUI();
-            GUILayout.BeginArea(SceneToolbarLayout.Area(viewRect, 60f));
-            GUILayout.FlexibleSpace();
-
+            GUILayout.BeginArea(SceneToolbarLayout.Panel(view.position, SceneToolbarLayout.PanelWidth));
             GUILayout.BeginVertical("box");
-            GUILayout.BeginHorizontal();
 
-            GUILayout.Label("层级", EditorStyles.miniBoldLabel);
+            GUILayout.Label(
+                Selected.Count == 1 ? Selected[0].gameObject.name : Selected.Count + " 个物体",
+                EditorStyles.miniBoldLabel);
+
+            // 层级就是 sortingOrder。同层内数值大的画在上面。
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("层级", EditorStyles.miniLabel);
 
             EditorGUI.BeginChangeCheck();
             EditorGUI.showMixedValue = HasMixedOrder();
-            int order = EditorGUILayout.IntField(Selected[0].sortingOrder, GUILayout.Width(48f));
+            int order = EditorGUILayout.IntField(Selected[0].sortingOrder, GUILayout.Width(44f));
             EditorGUI.showMixedValue = false;
 
             if (EditorGUI.EndChangeCheck()) ApplyOrder(order);
 
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
             // Z 和 sortingOrder 是一套东西的两半：层级相同时 Unity 就是靠 Z 决定谁在前，
             // 前景 / 背景分层就是靠它。
-            GUILayout.Space(10f);
+            GUILayout.BeginHorizontal();
             GUILayout.Label("Z", EditorStyles.miniLabel);
 
             EditorGUI.BeginChangeCheck();
             EditorGUI.showMixedValue = HasMixedZ();
             float depth = EditorGUILayout.FloatField(
-                Selected[0].transform.position.z, GUILayout.Width(56f));
+                Selected[0].transform.position.z, GUILayout.Width(48f));
             EditorGUI.showMixedValue = false;
 
             if (EditorGUI.EndChangeCheck()) ApplyZ(depth);
 
             // 命名保存的 Z（背景 / 地面 / 前景…），省得记数字。
-            if (GUILayout.Button("▾", EditorStyles.miniButton, GUILayout.Width(20f)))
+            if (GUILayout.Button("▾", EditorStyles.miniButton, GUILayout.Width(18f)))
                 DepthPresets.ShowMenu(Selected[0].transform.position.z, ApplyZ);
+
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
 
             if (HasColorControl())
             {
-                GUILayout.Space(12f);
+                GUILayout.BeginHorizontal();
                 GUILayout.Label("颜色", EditorStyles.miniLabel);
 
                 EditorGUI.BeginChangeCheck();
                 EditorGUI.showMixedValue = HasMixedColor();
                 Color color = EditorGUILayout.ColorField(
-                    GUIContent.none, GetColor(Selected[0]), true, true, false, GUILayout.Width(52f));
+                    GUIContent.none, GetColor(Selected[0]), true, true, false, GUILayout.Width(64f));
                 EditorGUI.showMixedValue = false;
 
                 if (EditorGUI.EndChangeCheck()) ApplyColor(color);
 
                 // Saved colours. The picker itself cannot hold names, so this is where a
                 // palette lives.
-                if (GUILayout.Button("▾", EditorStyles.miniButton, GUILayout.Width(20f)))
+                if (GUILayout.Button("▾", EditorStyles.miniButton, GUILayout.Width(18f)))
                     ColorPalette.ShowMenu(GetColor(Selected[0]), ApplyColor);
+
+                GUILayout.FlexibleSpace();
+                GUILayout.EndHorizontal();
             }
 
             // 碰撞体开关：给背景装饰关掉碰撞，不用去 Inspector 里翻。
             // 没有碰撞体时置灰而不是藏起来 —— 藏起来会让人以为这个功能没做。
-            GUILayout.Space(12f);
+            GUILayout.BeginHorizontal();
 
             using (new EditorGUI.DisabledScope(Colliders.Count == 0))
             {
@@ -208,14 +239,9 @@ namespace Terrain2D.EditorTools
             }
 
             GUILayout.FlexibleSpace();
-
-            GUILayout.Label(
-                Selected.Count == 1 ? Selected[0].gameObject.name : Selected.Count + " 个物体",
-                EditorStyles.miniLabel);
-
             GUILayout.EndHorizontal();
-            GUILayout.EndVertical();
 
+            GUILayout.EndVertical();
             GUILayout.EndArea();
             Handles.EndGUI();
         }
