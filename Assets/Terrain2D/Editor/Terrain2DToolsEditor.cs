@@ -1419,6 +1419,13 @@ namespace Terrain2D.EditorTools
 
             GUILayout.EndHorizontal();
 
+            // 默认开着：按 Play 的瞬间把相机抄到 Scene 视图的位置。
+            // 关掉之后就退回"相机摆在哪就在哪"的原始行为。
+            bool sync = GUILayout.Toggle(
+                TestCameraPrefs.SyncCameraOnPlay, " 按 Play 自动对准视口", EditorStyles.miniLabel);
+
+            if (sync != TestCameraPrefs.SyncCameraOnPlay) TestCameraPrefs.SyncCameraOnPlay = sync;
+
             if (rig == null)
             {
                 GUILayout.Label("还没有测试摄像机，创建测试角色时会一起建。", NoteStyle);

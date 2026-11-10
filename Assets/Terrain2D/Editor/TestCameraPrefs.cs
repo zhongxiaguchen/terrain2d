@@ -43,5 +43,20 @@ namespace Terrain2D.EditorTools
         {
             get { return Labels[(int)Mode]; }
         }
+
+        const string SyncKey = "Terrain2D.SyncCameraOnPlay";
+
+        /// <summary>
+        /// 按 Play 之前要不要把相机抄到 Scene 视图现在看的地方。默认开。
+        ///
+        /// 放在这里而不是 <see cref="PlayModeCameraSync"/> 里，是为了让读它的
+        /// 面板代码只依赖这个早就存在的文件 —— 新文件被旧文件引用会踩
+        /// 「先编译、后导入」的坑，反过来（新文件引用旧文件）不会。
+        /// </summary>
+        public static bool SyncCameraOnPlay
+        {
+            get { return EditorPrefs.GetBool(SyncKey, true); }
+            set { EditorPrefs.SetBool(SyncKey, value); }
+        }
     }
 }
