@@ -871,10 +871,10 @@ namespace Terrain2D.EditorTools
                     // 场景里有几个测试角色是这里最该先看到的数 —— 复制粘贴测试角色之后
                     // 经常会忘掉多出来的那几个，然后"怎么镜头跟的是另一个"。
                     var rig = FindTestCamera();
-                    TestCameraMode mode = rig != null ? rig.mode : Terrain2DMenuItems.CameraModePref;
+                    TestCameraMode mode = rig != null ? rig.mode : TestCameraPrefs.Mode;
 
                     return "角色 " + TestPlayerCount +
-                           "　" + Terrain2DMenuItems.CameraModeLabels[(int)mode];
+                           "　" + TestCameraPrefs.Labels[(int)mode];
                 }
 
                 case WorkStage.Asset:
@@ -1189,6 +1189,12 @@ namespace Terrain2D.EditorTools
         {
             var player = FindTestPlayer();
 
+            // ---- 摄像机 ----
+            //
+            // 放在角色上面：角色和镜头是一套测试装备，而且镜头的模式是**创建时**用到的。
+            // 先建角色再选模式的话，按下 Play 的头两秒人是跑出画面的。
+            DrawCameraRow();
+
             // ---- 角色 ----
             GUILayout.BeginHorizontal();
 
@@ -1212,7 +1218,7 @@ namespace Terrain2D.EditorTools
                     MovePlayerToStart(terrain, created);
 
                     // 角色和镜头是一套测试装备，创建角色就把镜头一起配好。
-                    Terrain2DMenuItems.EnsureTestCamera(Terrain2DMenuItems.CameraModePref, created.transform);
+                    Terrain2DMenuItems.EnsureTestCamera(TestCameraPrefs.Mode, created.transform);
 
                     _testPlayer = created;
                     player = created;
@@ -1235,9 +1241,6 @@ namespace Terrain2D.EditorTools
 
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
-
-            // ---- 摄像机 ----
-            DrawCameraRow();
 
             // ---- 碰撞体 ----
             GUILayout.BeginHorizontal();
@@ -1336,17 +1339,17 @@ namespace Terrain2D.EditorTools
 
             GUILayout.Label("摄像机", EditorStyles.miniLabel);
 
-            TestCameraMode current = rig != null ? rig.mode : Terrain2DMenuItems.CameraModePref;
+            TestCameraMode current = rig != null ? rig.mode : TestCameraPrefs.Mode;
 
             EditorGUI.BeginChangeCheck();
             int picked = EditorGUILayout.Popup(
-                (int)current, Terrain2DMenuItems.CameraModeLabels, EditorStyles.popup, GUILayout.Width(78f));
+                (int)current, TestCameraPrefs.Labels, EditorStyles.popup, GUILayout.Width(78f));
             bool changed = EditorGUI.EndChangeCheck();
 
             if (changed)
             {
                 var next = (TestCameraMode)picked;
-                Terrain2DMenuItems.CameraModePref = next;
+                TestCameraPrefs.Mode = next;
 
                 if (rig != null)
                 {
@@ -2119,31 +2122,6 @@ namespace Terrain2D.EditorTools
 
     internal static class Terrain2DMenuItems
     {
-        /// <summary>顺序必须和 TestCameraMode 一致。</summary>
-        public static readonly string[] CameraModeLabels = { "跟随", "仅水平", "仅垂直", "固定" };
-
-        const string CameraModeKey = "Terrain2D.TestCameraMode";
-
-        /// <summary>
-        /// 创建测试角色时用哪个摄像机模式。默认「跟随」。
-        ///
-        /// 存 EditorPrefs 而不是记在某个物体上：这个选择是"我习惯怎么试关卡"，
-        /// 和具体是哪块地形无关。还没建摄像机时也能先选，创建时直接生效。
-        /// </summary>
-        public static TestCameraMode CameraModePref
-        {
-            get
-            {
-                int raw = EditorPrefs.GetInt(CameraModeKey, (int)TestCameraMode.Follow);
-                return (TestCameraMode)Mathf.Clamp(raw, 0, CameraModeLabels.Length - 1);
-            }
-            set
-            {
-                EditorPrefs.SetInt(CameraModeKey,
-                    Mathf.Clamp((int)value, 0, CameraModeLabels.Length - 1));
-            }
-        }
-
         [MenuItem("GameObject/地形 2D/为选中的碰撞体添加多边形网格", false, 10)]
         static void AddPolygonMesh()
         {
@@ -2177,13 +2155,13 @@ namespace Terrain2D.EditorTools
             var player = BuildTestPlayer(command.context as GameObject, true);
 
             // 角色和镜头是一套测试装备。少了镜头，按 Play 跑两步人就没影了。
-            EnsureTestCamera(CameraModePref, player.transform);
+            EnsureTestCamera(TestCameraPrefs.Mode, player.transform);
         }
 
         [MenuItem("GameObject/地形 2D/创建测试摄像机", false, 13)]
         static void CreateTestCamera()
         {
-            EnsureTestCamera(CameraModePref, null);
+            EnsureTestCamera(TestCameraPrefs.Mode, null);
         }
 
         /// <summary>
