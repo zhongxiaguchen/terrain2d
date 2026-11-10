@@ -81,10 +81,15 @@ namespace Terrain2D
             _velocity = Vector3.zero;
         }
 
-        /// <summary>在场景里找一个测试角色当目标。</summary>
+        /// <summary>
+        /// 在场景里找一个测试角色当目标。
+        ///
+        /// 传 true 把未激活的也算上：跟随类模式的相机是绑在角色身上的，
+        /// 角色临时被 SetActive(false) 一下不该让相机丢掉目标、退回原地。
+        /// </summary>
         public Transform FindTarget()
         {
-            var player = Object.FindObjectOfType<TestPlayer2D>();
+            var player = Object.FindObjectOfType<TestPlayer2D>(true);
             return player != null ? player.transform : null;
         }
 
