@@ -867,7 +867,15 @@ namespace Terrain2D.EditorTools
             switch (TerrainStage.Current)
             {
                 case WorkStage.Test:
-                    return terrain.buildColliders ? "碰撞 开" : "碰撞 关";
+                {
+                    // 场景里有几个测试角色是这里最该先看到的数 —— 复制粘贴测试角色之后
+                    // 经常会忘掉多出来的那几个，然后"怎么镜头跟的是另一个"。
+                    var rig = FindTestCamera();
+                    TestCameraMode mode = rig != null ? rig.mode : Terrain2DMenuItems.CameraModePref;
+
+                    return "角色 " + TestPlayerCount +
+                           "　" + Terrain2DMenuItems.CameraModeLabels[(int)mode];
+                }
 
                 case WorkStage.Asset:
                 {
@@ -1117,6 +1125,8 @@ namespace Terrain2D.EditorTools
 
         // ------------------------------------------------------------------ 阶段二：测试
 
+        // ------------------------------------------------------------------ 阶段二：测试
+
         TestPlayer2D _testPlayer;
 
         /// <summary>
@@ -1129,6 +1139,50 @@ namespace Terrain2D.EditorTools
                 _testPlayer = UnityEngine.Object.FindObjectOfType<TestPlayer2D>(true);
 
             return _testPlayer;
+        }
+
+        /// <summary>
+        /// 场景里一共几个测试角色。缓存起来是因为标题行每次重绘都要读，
+        /// 而 FindObjectsOfType 每次都会分配一个数组 —— 拖控制点的时候重绘很频繁。
+        /// 增删物体时由 <see cref="OnHierarchyChanged"/> 清掉。
+        /// </summary>
+        static int _testPlayerCount = -1;
+
+        static int TestPlayerCount
+        {
+            get
+            {
+                if (_testPlayerCount < 0)
+                    _testPlayerCount = UnityEngine.Object
+                        .FindObjectsOfType<TestPlayer2D>(true).Length;
+
+                return _testPlayerCount;
+            }
+        }
+
+        static TestCamera2D _testCamera;
+
+        static TestCamera2D FindTestCamera()
+        {
+            if (_testCamera == null)
+                _testCamera = UnityEngine.Object.FindObjectOfType<TestCamera2D>();
+
+            return _testCamera;
+        }
+
+        static HeightmapTerrain2DEditor()
+        {
+            // 只在"场景里的物体变了"时清缓存。挂在 static 构造里而不是
+            // [InitializeOnLoad]，是因为这些缓存只有地形面板会读 —— 没选地形时
+            // 没必要为它跑一遍查找。
+            EditorApplication.hierarchyChanged -= OnHierarchyChanged;
+            EditorApplication.hierarchyChanged += OnHierarchyChanged;
+        }
+
+        static void OnHierarchyChanged()
+        {
+            _testPlayerCount = -1;
+            _testCamera = null;
         }
 
         void DrawTestRows(HeightmapTerrain2D terrain)
@@ -1157,6 +1211,9 @@ namespace Terrain2D.EditorTools
                     var created = Terrain2DMenuItems.BuildTestPlayer(null, false);
                     MovePlayerToStart(terrain, created);
 
+                    // 角色和镜头是一套测试装备，创建角色就把镜头一起配好。
+                    Terrain2DMenuItems.EnsureTestCamera(Terrain2DMenuItems.CameraModePref, created.transform);
+
                     _testPlayer = created;
                     player = created;
 
@@ -1167,11 +1224,20 @@ namespace Terrain2D.EditorTools
             using (new EditorGUI.DisabledScope(player == null))
             {
                 if (GUILayout.Button("放到左端", EditorStyles.miniButton, GUILayout.Width(64f)))
+                {
                     MovePlayerToStart(terrain, player);
+
+                    // 人瞬移了，镜头再慢慢飘过去会有一秒钟什么都看不见。
+                    var rig = FindTestCamera();
+                    if (rig != null) rig.SnapToTarget();
+                }
             }
 
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
+
+            // ---- 摄像机 ----
+            DrawCameraRow();
 
             // ---- 碰撞体 ----
             GUILayout.BeginHorizontal();
@@ -1187,21 +1253,21 @@ namespace Terrain2D.EditorTools
             // ---- 手感参数：直接写 TestPlayer2D 的字段，Play 中拖动立刻生效 ----
             if (player != null)
             {
-                DrawPlayerSlider("跳跃高度", player.jumpHeight, 0.5f, 8f, "0.00", value =>
+                DrawFloatSlider("跳跃高度", player.jumpHeight, 0.5f, 8f, "0.00", value =>
                 {
                     Undo.RecordObject(player, "改跳跃高度");
                     player.jumpHeight = value;
                     EditorUtility.SetDirty(player);
                 });
 
-                DrawPlayerSlider("移动速度", player.moveSpeed, 1f, 20f, "0.0", value =>
+                DrawFloatSlider("移动速度", player.moveSpeed, 1f, 20f, "0.0", value =>
                 {
                     Undo.RecordObject(player, "改移动速度");
                     player.moveSpeed = value;
                     EditorUtility.SetDirty(player);
                 });
 
-                DrawPlayerSlider("空中操控", player.airControl, 0f, 1f, "0.00", value =>
+                DrawFloatSlider("空中操控", player.airControl, 0f, 1f, "0.00", value =>
                 {
                     Undo.RecordObject(player, "改空中操控");
                     player.airControl = value;
@@ -1257,11 +1323,77 @@ namespace Terrain2D.EditorTools
         }
 
         /// <summary>
-        /// 一行「标签 + 滑块 + 数值」。窄面板里每个手感参数占一行，比三个并排好读。
+        /// 摄像机那一行：模式下拉 + 选中按钮。
+        ///
+        /// 还没有摄像机时下拉照样能改 —— 改的是"创建时用哪个模式"，
+        /// 存在 EditorPrefs 里，所以默认值「跟随」在重启后仍然成立。
+        /// </summary>
+        void DrawCameraRow()
+        {
+            var rig = FindTestCamera();
+
+            GUILayout.BeginHorizontal();
+
+            GUILayout.Label("摄像机", EditorStyles.miniLabel);
+
+            TestCameraMode current = rig != null ? rig.mode : Terrain2DMenuItems.CameraModePref;
+
+            EditorGUI.BeginChangeCheck();
+            int picked = EditorGUILayout.Popup(
+                (int)current, Terrain2DMenuItems.CameraModeLabels, EditorStyles.popup, GUILayout.Width(78f));
+            bool changed = EditorGUI.EndChangeCheck();
+
+            if (changed)
+            {
+                var next = (TestCameraMode)picked;
+                Terrain2DMenuItems.CameraModePref = next;
+
+                if (rig != null)
+                {
+                    Undo.RecordObject(rig, "改摄像机模式");
+                    rig.SetMode(next);
+                    EditorUtility.SetDirty(rig);
+                }
+
+                SceneView.RepaintAll();
+            }
+
+            using (new EditorGUI.DisabledScope(rig == null))
+            {
+                if (GUILayout.Button("选中", EditorStyles.miniButton, GUILayout.Width(42f)))
+                {
+                    Selection.activeGameObject = rig.gameObject;
+                    EditorGUIUtility.PingObject(rig.gameObject);
+                }
+            }
+
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            if (rig == null)
+            {
+                GUILayout.Label("还没有测试摄像机，创建测试角色时会一起建。", NoteStyle);
+                return;
+            }
+
+            // 固定视口没有"跟上的快慢"可言，藏起来免得让人以为它没用。
+            if (rig.mode != TestCameraMode.Fixed)
+            {
+                DrawFloatSlider("跟随快慢", rig.smoothTime, 0f, 0.6f, "0.00", value =>
+                {
+                    Undo.RecordObject(rig, "改摄像机跟随");
+                    rig.smoothTime = value;
+                    EditorUtility.SetDirty(rig);
+                });
+            }
+        }
+
+        /// <summary>
+        /// 一行「标签 + 滑块 + 数值」。窄面板里每个参数占一行，比三个并排好读。
         /// 值变了才回调，否则每帧都会 Undo.RecordObject。
         /// </summary>
-        void DrawPlayerSlider(string label, float value, float min, float max,
-                              string format, System.Action<float> apply)
+        void DrawFloatSlider(string label, float value, float min, float max,
+                             string format, System.Action<float> apply)
         {
             GUILayout.BeginHorizontal();
 
@@ -1987,6 +2119,31 @@ namespace Terrain2D.EditorTools
 
     internal static class Terrain2DMenuItems
     {
+        /// <summary>顺序必须和 TestCameraMode 一致。</summary>
+        public static readonly string[] CameraModeLabels = { "跟随", "仅水平", "仅垂直", "固定" };
+
+        const string CameraModeKey = "Terrain2D.TestCameraMode";
+
+        /// <summary>
+        /// 创建测试角色时用哪个摄像机模式。默认「跟随」。
+        ///
+        /// 存 EditorPrefs 而不是记在某个物体上：这个选择是"我习惯怎么试关卡"，
+        /// 和具体是哪块地形无关。还没建摄像机时也能先选，创建时直接生效。
+        /// </summary>
+        public static TestCameraMode CameraModePref
+        {
+            get
+            {
+                int raw = EditorPrefs.GetInt(CameraModeKey, (int)TestCameraMode.Follow);
+                return (TestCameraMode)Mathf.Clamp(raw, 0, CameraModeLabels.Length - 1);
+            }
+            set
+            {
+                EditorPrefs.SetInt(CameraModeKey,
+                    Mathf.Clamp((int)value, 0, CameraModeLabels.Length - 1));
+            }
+        }
+
         [MenuItem("GameObject/地形 2D/为选中的碰撞体添加多边形网格", false, 10)]
         static void AddPolygonMesh()
         {
@@ -2017,7 +2174,69 @@ namespace Terrain2D.EditorTools
         [MenuItem("GameObject/地形 2D/创建测试角色", false, 12)]
         static void CreateTestPlayer(MenuCommand command)
         {
-            BuildTestPlayer(command.context as GameObject, true);
+            var player = BuildTestPlayer(command.context as GameObject, true);
+
+            // 角色和镜头是一套测试装备。少了镜头，按 Play 跑两步人就没影了。
+            EnsureTestCamera(CameraModePref, player.transform);
+        }
+
+        [MenuItem("GameObject/地形 2D/创建测试摄像机", false, 13)]
+        static void CreateTestCamera()
+        {
+            EnsureTestCamera(CameraModePref, null);
+        }
+
+        /// <summary>
+        /// 确保场景里有一台测试摄像机，并把它切到指定模式。
+        ///
+        /// 优先复用已有的 <see cref="TestCamera2D"/>；没有的话挂在 <c>Camera.main</c> 上；
+        /// 连主摄像机都没有才新建一台。
+        ///
+        /// 为什么挂在主摄像机上而不是另建一台：同时存在两台启用的摄像机会双份渲染，
+        /// 而 2D 项目的主摄像机本来就已经配好了正交尺寸和背景色，加一个跟随组件
+        /// 是纯粹的增量 —— 不想要了把组件删掉就行，场景别的部分一点没动。
+        /// </summary>
+        public static TestCamera2D EnsureTestCamera(TestCameraMode mode, Transform target)
+        {
+            var rig = UnityEngine.Object.FindObjectOfType<TestCamera2D>();
+
+            if (rig == null)
+            {
+                Camera cam = Camera.main;
+
+                if (cam == null)
+                {
+                    var go = new GameObject("测试摄像机");
+                    Undo.RegisterCreatedObjectUndo(go, "创建测试摄像机");
+                    go.tag = "MainCamera";
+                    cam = go.AddComponent<Camera>();
+                    cam.orthographic = true;
+                    cam.orthographicSize = 5f;
+                }
+
+                rig = Undo.AddComponent<TestCamera2D>(cam.gameObject);
+            }
+
+            if (target == null)
+            {
+                var player = UnityEngine.Object.FindObjectOfType<TestPlayer2D>(true);
+                if (player != null) target = player.transform;
+            }
+
+            // 组件和 transform 都要记撤销：这一步会真的把相机挪位置，
+            // 不记的话 Ctrl+Z 只撤掉组件、镜头停在被拽过去的地方。
+            Undo.RecordObject(rig, "配置测试摄像机");
+            Undo.RecordObject(rig.transform, "移动测试摄像机");
+
+            rig.target = target;
+            rig.SetMode(mode);
+            rig.SnapToTarget();
+
+            EditorUtility.SetDirty(rig);
+            EditorUtility.SetDirty(rig.transform);
+            SceneView.RepaintAll();
+
+            return rig;
         }
 
         /// <summary>

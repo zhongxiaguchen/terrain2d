@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-10
+
+### Added
+
+- **`TestCamera2D` — the test rig now has a camera.** Without one, pressing Play meant
+  the character walked off screen in two seconds and you chased it with the Scene view.
+  Four modes, chosen when the rig is created:
+
+  | 模式 | 跟什么 | 用来验证 |
+  |---|---|---|
+  | **跟随**（默认） | 双轴 | 整段关卡 |
+  | **仅水平** | 只跟 X，Y 锁死 | 跳跃高度 —— 镜头不上下晃才看得出到底跳多高 |
+  | **仅垂直** | 只跟 Y，X 锁死 | 竖井 / 爬塔 |
+  | **固定** | 不跟 | 反复试同一屏 |
+
+  锁定的那一轴取的是**切到该模式时的相机位置**，不是世界 0 —— 所以「仅水平」保留你
+  当前摆好的构图高度，而不是把镜头拽到 `y = 0`。
+- **创建测试角色时一起配好摄像机**（面板按钮和菜单项都是）。优先复用已有的
+  `TestCamera2D`，没有就挂在 `Camera.main` 上，连主摄像机都没有才新建一台。
+  不另建一台是因为两台启用的摄像机会双份渲染，而主摄像机本来就已经配好了正交尺寸
+  和背景色 —— 加一个跟随组件是纯增量，删掉组件场景一点没动。
+- **测试阶段标题行显示场景里测试角色有几个** + 当前摄像机模式。
+  复制粘贴测试角色之后经常忘掉多出来的那几个，然后纳闷"镜头怎么跟的是另一个"。
+- 菜单 `GameObject ▸ 地形 2D ▸ 创建测试摄像机`。
+
+### Changed
+
+- 测试阶段面板新增「摄像机」一行（模式下拉 + 选中）和「跟随快慢」滑块；
+  「固定」模式下不显示跟随快慢，因为那个模式没有快慢可言。
+- 模式选择存在 `EditorPrefs` 的 `Terrain2D.TestCameraMode`，默认跟随。
+  还没建摄像机时也能先选，创建时直接生效。
+
 ## [0.4.0] - 2026-11-10
 
 ### Changed
@@ -245,6 +277,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Verified on Unity 2022.3.53f1 with URP 14 (2D Renderer).
 
 [Unreleased]: https://github.com/CHANGE_ME/terrain2d/commits/main
+[0.5.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/CHANGE_ME/terrain2d/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.2.0...v0.3.0
