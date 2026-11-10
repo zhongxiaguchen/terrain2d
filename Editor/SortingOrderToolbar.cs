@@ -39,6 +39,7 @@ namespace Terrain2D.EditorTools
         // Must match the [MenuItem] paths in Terrain2DToolsEditor exactly.
         const string CreateTerrainMenu = "GameObject/地形 2D/创建高度场地形";
         const string CreatePlayerMenu = "GameObject/地形 2D/创建测试角色";
+        const string AlignCameraMenu = "Tools/地形 2D/相机对准视口";
 
         // 固定栏只装标题 + 三段选择器，所以宽度是算出来的而不是撑满：
         // 撑满会把整条视口底边都占掉，看着像条横幅。
@@ -151,6 +152,11 @@ namespace Terrain2D.EditorTools
                     if (GUILayout.Button("创建测试角色（" + TestCameraPrefs.ModeLabel + "）",
                                          EditorStyles.miniButton))
                         EditorApplication.ExecuteMenuItem(CreatePlayerMenu);
+
+                    // 什么都没选时最可能干的事就是"按 Play 看看" —— 而按下去一片蓝
+                    // 基本都是相机没照到地形。这里给个不需要先选地形的入口。
+                    if (GUILayout.Button("相机对准视口", EditorStyles.miniButton))
+                        EditorApplication.ExecuteMenuItem(AlignCameraMenu);
 
                     break;
                 }

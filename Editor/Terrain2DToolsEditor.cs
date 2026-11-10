@@ -1100,6 +1100,9 @@ namespace Terrain2D.EditorTools
             // 人往往是在搭的时候顺手按一下 Play 看看，不会专门切到测试阶段。
             GUILayout.BeginHorizontal();
 
+            if (GUILayout.Button("对准视口", EditorStyles.miniButton, GUILayout.Width(64f)))
+                Terrain2DMenuItems.AlignCameraToSceneView(ResolveCamera());
+
             if (GUILayout.Button("对准地形", EditorStyles.miniButton, GUILayout.Width(64f)))
                 Terrain2DMenuItems.FrameTerrain(ResolveCamera(), terrain);
 
@@ -1403,11 +1406,18 @@ namespace Terrain2D.EditorTools
 
             // 「按 Play 一片蓝」的头号原因不是渲染坏了，是镜头压根没照到地形 ——
             // 地形可以离原点很远，而主相机默认停在原点、正交尺寸 5。
-            // 给一个一键框住的入口，比让人自己去 Game 视图里比划半天靠谱。
+            //
+            // 两个入口：「对准视口」直接抄 Scene 视图现在看的地方（所见即所得，最稳）；
+            // 「对准地形」按包围盒自动框住选中的那块（不依赖你已经把视口摆好）。
+            GUILayout.BeginHorizontal();
+
+            if (GUILayout.Button("对准视口", EditorStyles.miniButton))
+                Terrain2DMenuItems.AlignCameraToSceneView(ResolveCamera());
+
             if (GUILayout.Button("对准地形", EditorStyles.miniButton))
-            {
                 Terrain2DMenuItems.FrameTerrain(ResolveCamera(), terrain);
-            }
+
+            GUILayout.EndHorizontal();
 
             if (rig == null)
             {
@@ -2201,6 +2211,19 @@ namespace Terrain2D.EditorTools
         }
 
         /// <summary>
+        /// 菜单入口：把相机抄到 Scene 视图现在看的地方。
+        ///
+        /// 单独开一个菜单项是因为「什么都没选」的阶段面板也要能点，而那个面板在
+        /// <see cref="SortingOrderToolbar"/> 里 —— 两个编辑器文件互相引用会踩到
+        /// Unity 增量编译「先编译、后导入」的坑，走菜单字符串调用最安全。
+        /// </summary>
+        [MenuItem("Tools/地形 2D/相机对准视口", false, 20)]
+        static void AlignCameraToSceneViewMenu()
+        {
+            AlignCameraToSceneView(Camera.main);
+        }
+
+        /// <summary>
         /// 确保场景里有一台测试摄像机，并把它切到指定模式。
         ///
         /// 优先复用已有的 <see cref="TestCamera2D"/>；没有的话挂在 <c>Camera.main</c> 上；
@@ -2302,6 +2325,57 @@ namespace Terrain2D.EditorTools
             if (rig != null)
             {
                 Undo.RecordObject(rig, "对准地形");
+                rig.CaptureLock();
+                EditorUtility.SetDirty(rig);
+            }
+
+            EditorUtility.SetDirty(cam);
+            EditorUtility.SetDirty(cam.transform);
+            SceneView.RepaintAll();
+        }
+
+        /// <summary>
+        /// 把相机摆到 Scene 视图当前看的地方：位置取视口焦点沿**视线反方向**退 10 单位，
+        /// 朝向和正交尺寸都跟 Scene 视图一致。
+        ///
+        /// 为什么这个比 <see cref="FrameTerrain"/> 更可靠：人已经把 Scene 视图挪到想看的地方了，
+        /// 直接抄过来就是"所见即所得"，不需要猜用户想框哪块地形。
+        ///
+        /// 而且它**不碰 Camera.aspect** —— 编辑器里这个值在没有渲染上下文时不一定是
+        /// Game 视图的真实比例，拿它算正交尺寸，一旦偏小就会把地形缩到看不见，
+        /// 表现和"什么都没渲染"一模一样。
+        ///
+        /// 10 这个距离不是随便取的：2D 视口的 forward 就是 +Z，pivot 的 z 通常是 0，
+        /// 退 10 单位正好落在相机默认的 z = -10 上，和 Unity 新建场景的约定一致。
+        /// </summary>
+        public static void AlignCameraToSceneView(Camera cam)
+        {
+            if (cam == null) return;
+
+            SceneView view = SceneView.lastActiveSceneView;
+            if (view == null) return;
+
+            Undo.RecordObject(cam.transform, "对准视口");
+            Undo.RecordObject(cam, "对准视口");
+
+            // 视线反方向 = -forward。相机要"从后退 10 单位的地方看向 pivot"，
+            // 所以位置是 pivot - forward * 10。
+            Vector3 forward = view.rotation * Vector3.forward;
+
+            cam.transform.position = view.pivot - forward * 10f;
+            cam.transform.rotation = view.rotation;
+
+            cam.orthographic = true;
+
+            // Scene 视图的 size 就是正交半高，抄过来画面才和视口一模一样。
+            cam.orthographicSize = Mathf.Max(0.5f, view.size);
+
+            // 相机上有跟随组件时锁定点要一起更新，否则「仅水平 / 仅垂直 / 固定」
+            // 按下 Play 会跳回对齐之前的位置。
+            var rig = cam.GetComponent<TestCamera2D>();
+            if (rig != null)
+            {
+                Undo.RecordObject(rig, "对准视口");
                 rig.CaptureLock();
                 EditorUtility.SetDirty(rig);
             }
