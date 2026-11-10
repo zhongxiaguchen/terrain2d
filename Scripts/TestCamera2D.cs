@@ -58,6 +58,42 @@ namespace Terrain2D
 
         Vector3 _velocity;
 
+        /// <summary>相机站在地形平面前面多远。2D 项目的约定值是 10。</summary>
+        public const float CameraDepth = 10f;
+
+        /// <summary>
+        /// 场景里地形所在的 Z 平面 —— 所有地形 Transform 的 Z 平均值。
+        ///
+        /// **相机必须站在这个平面前面 <see cref="CameraDepth"/> 处才看得见东西。**
+        /// 贴着平面站（或者站到平面后面）会被近裁面裁掉，画面就只剩相机背景色，
+        /// 看起来和"渲染坏了"一模一样 —— 实际发生过一次，地形在 z = 0、
+        /// 相机被摆在 z ≈ -0.2，距离 0.2 小于近裁面 0.3，满屏蓝。
+        ///
+        /// 没有地形时退回 0，和 Unity 新建场景的约定一致。
+        /// </summary>
+        public static float ScenePlaneZ()
+        {
+            var terrains = Object.FindObjectsOfType<HeightmapTerrain2D>(true);
+            if (terrains.Length == 0) return 0f;
+
+            float sum = 0f;
+            for (int i = 0; i < terrains.Length; i++) sum += terrains[i].transform.position.z;
+
+            return sum / terrains.Length;
+        }
+
+        // 算一次就缓存：LateUpdate 每帧都要读，FindObjectsOfType 每帧调太贵。
+        float _planeZ = float.NaN;
+
+        float PlaneZ
+        {
+            get
+            {
+                if (float.IsNaN(_planeZ)) _planeZ = ScenePlaneZ();
+                return _planeZ;
+            }
+        }
+
         /// <summary>把当前相机位置记成锁定点。</summary>
         public void CaptureLock()
         {
@@ -104,6 +140,9 @@ namespace Terrain2D
             // 场景加载 / 重新启用时按当前位置重新锁定。存档时存的是位置，
             // 所以"锁定"在重启后仍然指向你上次摆好的构图。
             CaptureLock();
+
+            // 地形可能被挪过 Z，缓存作废。
+            _planeZ = float.NaN;
         }
 
         void LateUpdate()
@@ -117,8 +156,10 @@ namespace Terrain2D
                 ? want
                 : Vector3.SmoothDamp(transform.position, want, ref _velocity, smoothTime);
 
-            // Z 不参与跟随：2D 靠 Z 分层，镜头被拽到目标的 Z 上会整层错位。
-            next.z = transform.position.z;
+            // Z 既不跟目标、也不跟当前位置 —— 按场景地形所在的平面退后固定距离。
+            // 用当前位置的话，一旦相机被摆在贴着地形的地方（差 0.2 < 近裁面 0.3），
+            // 它就永远看不见东西，而且会一直保持那个错误的值。
+            next.z = PlaneZ - CameraDepth;
 
             transform.position = next;
         }
@@ -127,36 +168,40 @@ namespace Terrain2D
         {
             Vector3 here = transform.position;
 
+            // Z 只有一种取法：地形平面再往前 CameraDepth。四种模式都一样 ——
+            // 它描述的是"镜头离场景多远"，不是"跟不跟角色"的一部分。
+            float z = PlaneZ - CameraDepth;
+
             switch (mode)
             {
                 case TestCameraMode.Fixed:
-                    return new Vector3(_lockedPoint.x, _lockedPoint.y, here.z);
+                    return new Vector3(_lockedPoint.x, _lockedPoint.y, z);
 
                 case TestCameraMode.HorizontalOnly:
                 {
                     Transform t = ResolveTarget();
-                    if (t == null) return here;
+                    if (t == null) return new Vector3(here.x, here.y, z);
 
-                    return new Vector3(t.position.x + offset.x, _lockedPoint.y, here.z);
+                    return new Vector3(t.position.x + offset.x, _lockedPoint.y, z);
                 }
 
                 case TestCameraMode.VerticalOnly:
                 {
                     Transform t = ResolveTarget();
-                    if (t == null) return here;
+                    if (t == null) return new Vector3(here.x, here.y, z);
 
-                    return new Vector3(_lockedPoint.x, t.position.y + offset.y, here.z);
+                    return new Vector3(_lockedPoint.x, t.position.y + offset.y, z);
                 }
 
                 default:
                 {
                     Transform t = ResolveTarget();
-                    if (t == null) return here;
+                    if (t == null) return new Vector3(here.x, here.y, z);
 
                     return new Vector3(
                         t.position.x + offset.x,
                         t.position.y + offset.y,
-                        here.z);
+                        z);
                 }
             }
         }
