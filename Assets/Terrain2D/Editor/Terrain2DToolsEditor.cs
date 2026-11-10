@@ -2241,11 +2241,18 @@ namespace Terrain2D.EditorTools
             Undo.RecordObject(cam.transform, "对准视口");
             Undo.RecordObject(cam, "对准视口");
 
-            // 视线反方向 = -forward。相机要"从后退 10 单位的地方看向 pivot"，
-            // 所以位置是 pivot - forward * 10。
-            Vector3 forward = view.rotation * Vector3.forward;
+            // X / Y 抄 Scene 视图 —— 用户已经用眼睛摆好了，这里不需要推导。
+            //
+            // Z **不能**抄 pivot：pivot.z 取决于 Scene 视图被平移到了哪里，
+            // 有可能正好贴着地形平面（实测出现过 z ≈ -0.2 的情况），
+            // 那样相机和地形只差 0.2，比近裁面 0.3 还近，满屏背景色。
+            // 改成按场景地形所在的平均平面退后固定距离 —— 这个值不随视图状态变。
+            Vector3 pos = new Vector3(
+                view.pivot.x,
+                view.pivot.y,
+                TestCamera2D.ScenePlaneZ() - TestCamera2D.CameraDepth);
 
-            cam.transform.position = view.pivot - forward * 10f;
+            cam.transform.position = pos;
             cam.transform.rotation = view.rotation;
 
             cam.orthographic = true;
