@@ -22,9 +22,9 @@ namespace Terrain2D.EditorTools
     /// <summary>
     /// 阶段状态的唯一持有者，以及那条阶段选择器唯一的画法。
     ///
-    /// 为什么值得单独拆一个文件：视口底部其实有**两条**工具栏，互斥显示 ——
-    /// 选中地形时是地形工具栏（Terrain2DToolsEditor），什么都没选时是起始工具栏
-    /// （SortingOrderToolbar）。两条都要显示阶段，而阶段只有一个值，
+    /// 为什么值得单独拆一个文件：视口里有两处要用阶段 ——
+    /// 左下角的固定栏（SortingOrderToolbar）和左上角的阶段面板
+    /// （HeightmapTerrain2DEditor / SortingOrderToolbar 都会画）。阶段只有一个值，
     /// 所以状态和画法都不能挂在任何一个 Editor 实例上。
     /// </summary>
     internal static class TerrainStage
@@ -57,8 +57,8 @@ namespace Terrain2D.EditorTools
         /// <summary>
         /// 画那条三段选择器，返回 true 表示这一帧真的切换了阶段。
         ///
-        /// 调用方要据此重绘：两条工具栏各在自己的 Scene GUI 回调里画，
-        /// 不主动 Repaint 的话，另一条会停在旧阶段直到下一次鼠标事件。
+        /// 调用方要据此重绘：固定栏和阶段面板是两个独立的 Scene GUI 回调，
+        /// 不主动 Repaint 的话，面板会停在旧阶段直到下一次鼠标事件。
         /// </summary>
         public static bool DrawSelector(float width = 170f)
         {
