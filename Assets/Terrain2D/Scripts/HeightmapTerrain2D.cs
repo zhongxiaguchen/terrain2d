@@ -118,17 +118,14 @@ namespace Terrain2D
         public bool flipWinding = false;
 
         [Header("碰撞")]
-        [Tooltip("总开关。关掉后不会创建或更新任何碰撞体。")]
+        [Tooltip("开关。关掉后不会创建或更新任何碰撞体，已有的也会被禁用。")]
         public bool buildColliders = true;
 
-        [Tooltip("沿地表生成一条开链碰撞体。最省性能，站立/行走用这个就够了。推荐开启。")]
-        public bool buildEdgeCollider = true;
-
-        [Tooltip("给边缘一点厚度，防止高速物体穿透。一般 0.02 左右。")]
-        public float edgeRadius = 0f;
-
-        [Tooltip("生成整条带子的封闭轮廓。需要从下方或侧面撞到地形，或地形底部不规则时打开。")]
-        public bool buildPolygonCollider = false;
+        // 碰撞体是**整个体块**的闭合轮廓（地表 + 右链 + 底边 + 左链），
+        // 和渲染用的是同一套点。以前这里是「地表一条开链」的 EdgeCollider2D，
+        // 那条链没有内外之分 —— 从下方、侧面都能穿进去，而且地表一旦有折
+        // （相邻采样点 X 反过来）就会在折的地方断开，走过去莫名其妙掉下去。
+        // 现在统一用 PolygonCollider2D，整块实心，从任何方向都挡。
 
         [Tooltip("只作用于碰撞体的垂直偏移。用来把碰撞边缘从视觉边缘推开。")]
         public float colliderOffsetY = 0f;
@@ -184,7 +181,6 @@ namespace Terrain2D
         Mesh _mesh;
         MeshFilter _filter;
         MeshRenderer _renderer;
-        EdgeCollider2D _edge;
         PolygonCollider2D _poly;
 
         // 地表 X 是否严格递增。自由横拖可以把某个点的 X 拖过它的邻居，那样二分查找
@@ -1255,8 +1251,12 @@ namespace Terrain2D
         /// </summary>
         void DisableColliders()
         {
-            if (_edge != null) _edge.enabled = false;
             if (_poly != null) _poly.enabled = false;
+
+            // 旧版本留下的 EdgeCollider2D 也要一起关 —— 否则"关了碰撞体"之后
+            // 人走过去还是被那条旧链挡住。
+            EdgeCollider2D staleEdge = GetComponent<EdgeCollider2D>();
+            if (staleEdge != null) staleEdge.enabled = false;
         }
 
         /// <summary>
@@ -1420,108 +1420,102 @@ namespace Terrain2D
             MeshUtil.EnsureMaterial(Renderer);
         }
 
+        /// <summary>
+        /// 生成碰撞体：整个体块一条闭合轮廓（地表 + 右链 + 底边 + 左链），
+        /// 和 <see cref="BuildOutline"/> 用的是同一套点，所以视觉和碰撞永远对得上。
+        ///
+        /// 以前这里是「地表一条开链」的 EdgeCollider2D。那条链没有内外之分，
+        /// 从下方、侧面都能穿进去；地表一有折（相邻采样点 X 反过来）就会在折的
+        /// 地方断开，走过去莫名掉下去。现在统一用实心多边形，从任何方向都挡。
+        /// </summary>
         void BuildColliders()
         {
-            int stride = Mathf.Max(1, colliderStride);
+            // 轮廓自交时耳切解不出来（OutlineValid = false），这条轮廓拿去拼多边形
+            // 碰撞只会得到一堆乱三角，表现是"碰撞忽然没了"或者"人被弹飞"。
+            // 保留上一次的碰撞体，等轮廓修好再更新 —— 和网格那边"不清空、只停更"
+            // 的处理保持一致。
+            if (!OutlineValid) return;
 
-            // 参与碰撞的采样点，始终包含最后一个点。
-            var top = new List<Vector2>();
-            var bottom = new List<Vector2>();
+            // 旧版本在这个物体上生成过 EdgeCollider2D。现在不用了，但场景里已经
+            // 挂着的那个必须关掉 —— 留着会是一条看不见的旧碰撞线，走过去被莫名挡住。
+            EdgeCollider2D staleEdge = GetComponent<EdgeCollider2D>();
+            if (staleEdge != null) staleEdge.enabled = false;
 
-            // 视觉轮廓的顶部**不是**从地表的第一个采样点开始的 —— BuildOutline()
-            // 会先把左边链的顶点连过来。用户把左边界拖离地表端点之后，那一段在
-            // 视觉上有地面、碰撞折线里却没有，走过去就是"踏空"。
-            //
-            // 实测某块地形的左边链顶点在 x ≈ 1.8，而地表第一个采样点在 x ≈ 14.8，
-            // 中间 13 个单位视觉上是封住的、碰撞上完全空白。
-            //
-            // 所以碰撞折线必须把两端的链顶点也带上，和 BuildOutline() 用同一套点。
-            var leftChain = LeftEdge;
+            if (_poly == null) _poly = GetComponent<PolygonCollider2D>();
+            if (_poly == null) _poly = gameObject.AddComponent<PolygonCollider2D>();
 
-            if (leftChain.Count > 0)
+            if (_poly == null)
             {
-                Vector2 end = leftChain[leftChain.Count - 1];
-                top.Add(new Vector2(end.x, end.y + colliderOffsetY));
+                // 2D 和 3D 碰撞体不能共存：物体上已经有 MeshCollider / BoxCollider 之类的
+                // 3D 碰撞体时，AddComponent 会直接失败并返回 null，Console 里只有一句
+                // "Can't add component 'PolygonCollider2D' to X because it conflicts with
+                // the existing 'MeshCollider' derived component!"。
+                //
+                // 以前这里没判空，下一行就抛 NullReferenceException，**把整个 Rebuild
+                // 打断**。表现是这块地形完全没有碰撞、走过去直接掉下去，而 Inspector 上
+                // 看不出任何异常。所以这里必须挡住，并且把原因喊出来。
+                Debug.LogWarning(
+                    "「" + name + "」上已经有 3D 碰撞体（MeshCollider / BoxCollider 等），" +
+                    "Unity 不允许 2D 和 3D 碰撞体挂在同一个物体上，所以这块地形生成不了碰撞体。\n" +
+                    "请删掉那个 3D 碰撞体，地形会自动重新生成。", this);
+                return;
             }
 
-            for (int i = 0; i < sampleCount; i += stride)
+            List<Vector2> outline;
+
+            if (HasStraightSides)
             {
-                top.Add(new Vector2(TopXAt(i), _heights[i] + colliderOffsetY));
-                bottom.Add(new Vector2(BottomXAt(i), BottomAt(i) + colliderOffsetY));
+                // 没有左右链、没有独立底边、也没有横向拖动时，轮廓退化成一条带子，
+                // 按采样点直接铺就行，不用走耳切。
+                int stride = Mathf.Max(1, colliderStride);
+
+                var top = new List<Vector2>();
+                var bottom = new List<Vector2>();
+
+                for (int i = 0; i < sampleCount; i += stride)
+                {
+                    top.Add(new Vector2(TopXAt(i), _heights[i] + colliderOffsetY));
+                    bottom.Add(new Vector2(BottomXAt(i), BottomAt(i) + colliderOffsetY));
+                }
+
+                // stride 跳过了最后一个采样点就补回来 —— 否则地形右端会缺一截碰撞。
+                if ((sampleCount - 1) % stride != 0)
+                {
+                    int last = sampleCount - 1;
+                    top.Add(new Vector2(TopXAt(last), _heights[last] + colliderOffsetY));
+                    bottom.Add(new Vector2(BottomXAt(last), BottomAt(last) + colliderOffsetY));
+                }
+
+                // 沿地表从左到右，再沿底部从右到左折回来。顺时针，正是
+                // PolygonCollider2D 对外轮廓的期望方向。
+                outline = new List<Vector2>(top.Count * 2);
+                outline.AddRange(top);
+                for (int i = bottom.Count - 1; i >= 0; i--) outline.Add(bottom[i]);
+            }
+            else
+            {
+                // 左右边加过控制点、或者底边是独立折线：直接用完整轮廓。
+                // 视觉网格走的是同一个 BuildOutline()，两边不可能分叉。
+                outline = new List<Vector2>();
+                BuildOutline(outline);
+
+                if (colliderOffsetY != 0f)
+                {
+                    for (int i = 0; i < outline.Count; i++)
+                        outline[i] = new Vector2(outline[i].x, outline[i].y + colliderOffsetY);
+                }
             }
 
-            // stride 跳过了最后一个采样点就补回来 —— 否则地形右端会缺一截碰撞。
-            if ((sampleCount - 1) % stride != 0)
+            if (outline.Count < 3)
             {
-                int last = sampleCount - 1;
-                top.Add(new Vector2(TopXAt(last), _heights[last] + colliderOffsetY));
-                bottom.Add(new Vector2(BottomXAt(last), BottomAt(last) + colliderOffsetY));
-            }
-
-            // 右边链的起点同理：视觉从那里开始往下走，碰撞也要跟过去。
-            var rightChain = RightEdge;
-
-            if (rightChain.Count > 0)
-            {
-                Vector2 start = rightChain[0];
-                top.Add(new Vector2(start.x, start.y + colliderOffsetY));
-            }
-
-            if (top.Count < 2)
-            {
-                // 连两个点都凑不出来，说明地形数据坏了。保留上一次的碰撞体，
+                // 凑不出一个面，说明地形数据坏了。保留上一次的碰撞体，
                 // 别把玩家脚底下的地面撤掉。
                 return;
             }
 
-            if (buildEdgeCollider)
-            {
-                if (_edge == null) _edge = GetComponent<EdgeCollider2D>();
-                if (_edge == null) _edge = gameObject.AddComponent<EdgeCollider2D>();
-                _edge.edgeRadius = edgeRadius;
-                _edge.points = top.ToArray();
-                _edge.enabled = true;
-            }
-            else if (_edge != null)
-            {
-                _edge.enabled = false;
-            }
-
-            if (buildPolygonCollider)
-            {
-                if (_poly == null) _poly = GetComponent<PolygonCollider2D>();
-                if (_poly == null) _poly = gameObject.AddComponent<PolygonCollider2D>();
-
-                List<Vector2> outline;
-
-                if (HasStraightSides)
-                {
-                    // 封闭轮廓：沿地表从左到右，再沿底部从右到左折回来。
-                    // 顺时针，正是 PolygonCollider2D 对外轮廓的期望方向。
-                    outline = new List<Vector2>(top);
-                    for (int i = bottom.Count - 1; i >= 0; i--) outline.Add(bottom[i]);
-                }
-                else
-                {
-                    // 左右边加过控制点：直接用完整轮廓，保证碰撞和渲染一致。
-                    outline = new List<Vector2>();
-                    BuildOutline(outline);
-
-                    if (colliderOffsetY != 0f)
-                    {
-                        for (int i = 0; i < outline.Count; i++)
-                            outline[i] = new Vector2(outline[i].x, outline[i].y + colliderOffsetY);
-                    }
-                }
-
-                _poly.pathCount = 1;
-                _poly.SetPath(0, outline.ToArray());
-                _poly.enabled = true;
-            }
-            else if (_poly != null)
-            {
-                _poly.enabled = false;
-            }
+            _poly.pathCount = 1;
+            _poly.SetPath(0, outline.ToArray());
+            _poly.enabled = true;
         }
     }
 }
