@@ -26,7 +26,7 @@ if (argv.length === 0) {
   node send.mjs '<JSON>'     发一条命令
   node send.mjs <文件>       从文件读（数组 = 一批）
   node send.mjs --tail [n]   看最近 n 条事件（默认 20）
-  node send.mjs --state      打印当前地形快照（截断高度数组）
+  node send.mjs --state      列出地形和标记（含高度范围、revision）
   node send.mjs --ping       看编辑器活着没有`);
   process.exit(0);
 }
