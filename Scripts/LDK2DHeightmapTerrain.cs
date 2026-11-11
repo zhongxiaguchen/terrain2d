@@ -183,6 +183,29 @@ namespace LDK2D
         MeshRenderer _renderer;
         PolygonCollider2D _poly;
 
+        // 重建用的持久缓冲区。**每帧 new 一批 List 是拖动发涩的主因** ——
+        // 512 采样点一次重建要扔 ~61 KB 垃圾，60Hz 就是 3.7 MB/s。
+        // 改成字段级复用之后，稳态下重建零分配。
+        readonly LDK2DMeshBuffers _meshBuffers = new LDK2DMeshBuffers();
+
+        // 碰撞轮廓同理：以前每次重建都 new 三个 List 再 ToArray()。
+        readonly List<Vector2> _colliderTop = new List<Vector2>();
+        readonly List<Vector2> _colliderBottom = new List<Vector2>();
+        readonly List<Vector2> _colliderOutline = new List<Vector2>();
+
+        // 耳切那条路要先把闭合轮廓摊出来，也复用一份。
+        readonly List<Vector2> _outlineBuffer = new List<Vector2>();
+
+        // SetPath 只收数组，所以留一份按需增长的副本，不每次 ToArray()。
+        Vector2[] _colliderPath = new Vector2[0];
+
+        // 上一次建网格走的是哪条路（true = 三角带）。
+        //
+        // 用途：耳切和三角带的**索引来源完全不同**，但顶点数有可能恰好相同。
+        // 从耳切切回三角带时不把复用状态清掉，就会误判成"拓扑没变"、
+        // 沿用耳切那套索引 —— 表现是地形三角形全乱。
+        bool _lastMeshWasStrip;
+
         // 地表 X 是否严格递增。自由横拖可以把某个点的 X 拖过它的邻居，那样二分查找
         // 就不成立了。SampleHeight 可能被寻路/刷怪每帧调用，所以结果缓存起来，
         // 只在形状变化（Rebuild / 拖点）时失效。
@@ -1345,9 +1368,15 @@ namespace LDK2D
         {
             int n = sampleCount;
 
-            var verts = new List<Vector3>(n * 2);
-            var uvs = new List<Vector2>(n * 2);
-            var tris = new List<int>((n - 1) * 6);
+            // 上一次是耳切建的，索引来源完全不同 —— 强制全量重建，别误用旧索引。
+            if (!_lastMeshWasStrip) _meshBuffers.Invalidate();
+
+            // 复用持久缓冲区，稳态下这里一次分配都没有。
+            _meshBuffers.Begin(n * 2, (n - 1) * 6);
+
+            List<Vector3> verts = _meshBuffers.Verts;
+            List<Vector2> uvs = _meshBuffers.Uvs;
+            List<int> tris = _meshBuffers.Tris;
 
             for (int i = 0; i < n; i++)
             {
@@ -1376,18 +1405,19 @@ namespace LDK2D
             }
 
             OutlineValid = true;
-            _mesh = LDK2DMeshUtil.Build("LDK2DHeightmapTerrain", _mesh, verts, uvs, tris, flipWinding);
+            _mesh = LDK2DMeshUtil.Build("LDK2DHeightmapTerrain", _mesh, _meshBuffers, flipWinding);
             Filter.sharedMesh = _mesh;
             LDK2DMeshUtil.EnsureMaterial(Renderer);
+            _lastMeshWasStrip = true;
         }
 
         void BuildOutlineMesh()
         {
-            var outline = new List<Vector2>();
-            BuildOutline(outline);
+            _outlineBuffer.Clear();
+            BuildOutline(_outlineBuffer);
 
-            var tris = LDK2DTriangulator.Triangulate(outline);
-            OutlineValid = tris.Count > 0;
+            List<int> pathTris = LDK2DTriangulator.Triangulate(_outlineBuffer);
+            OutlineValid = pathTris.Count > 0;
 
             if (!OutlineValid)
             {
@@ -1399,25 +1429,32 @@ namespace LDK2D
             }
 
             // 耳切输出逆时针，翻成顺时针以匹配 Unity 的正面朝向。
-            for (int i = 0; i + 2 < tris.Count; i += 3)
+            for (int i = 0; i + 2 < pathTris.Count; i += 3)
             {
-                int t = tris[i];
-                tris[i] = tris[i + 1];
-                tris[i + 1] = t;
+                int t = pathTris[i];
+                pathTris[i] = pathTris[i + 1];
+                pathTris[i + 1] = t;
             }
 
-            var verts = new List<Vector3>(outline.Count);
-            var uvs = new List<Vector2>(outline.Count);
+            int count = _outlineBuffer.Count;
+            _meshBuffers.Begin(count, pathTris.Count);
 
-            for (int i = 0; i < outline.Count; i++)
+            for (int i = 0; i < count; i++)
             {
-                verts.Add(new Vector3(outline[i].x, outline[i].y, 0f));
-                uvs.Add(UvFor(outline[i].x, outline[i].y));
+                Vector2 p = _outlineBuffer[i];
+                _meshBuffers.Verts.Add(new Vector3(p.x, p.y, 0f));
+                _meshBuffers.Uvs.Add(UvFor(p.x, p.y));
             }
 
-            _mesh = LDK2DMeshUtil.Build("LDK2DHeightmapTerrain", _mesh, verts, uvs, tris, flipWinding);
+            _meshBuffers.Tris.AddRange(pathTris);
+
+            // 耳切的索引不保证"点数相同就索引相同"，强制全量重建。
+            _meshBuffers.Invalidate();
+
+            _mesh = LDK2DMeshUtil.Build("LDK2DHeightmapTerrain", _mesh, _meshBuffers, flipWinding);
             Filter.sharedMesh = _mesh;
             LDK2DMeshUtil.EnsureMaterial(Renderer);
+            _lastMeshWasStrip = false;
         }
 
         /// <summary>
@@ -1461,7 +1498,9 @@ namespace LDK2D
                 return;
             }
 
-            List<Vector2> outline;
+            // 复用持久缓冲区：以前每次重建都 new 三个 List 再 ToArray()，
+            // 512 点就是 3 次分配 + 4 KB 数组，拖动时按 60Hz 算非常可观。
+            _colliderOutline.Clear();
 
             if (HasStraightSides)
             {
@@ -1469,52 +1508,56 @@ namespace LDK2D
                 // 按采样点直接铺就行，不用走耳切。
                 int stride = Mathf.Max(1, colliderStride);
 
-                var top = new List<Vector2>();
-                var bottom = new List<Vector2>();
+                _colliderTop.Clear();
+                _colliderBottom.Clear();
 
                 for (int i = 0; i < sampleCount; i += stride)
                 {
-                    top.Add(new Vector2(TopXAt(i), _heights[i] + colliderOffsetY));
-                    bottom.Add(new Vector2(BottomXAt(i), BottomAt(i) + colliderOffsetY));
+                    _colliderTop.Add(new Vector2(TopXAt(i), _heights[i] + colliderOffsetY));
+                    _colliderBottom.Add(new Vector2(BottomXAt(i), BottomAt(i) + colliderOffsetY));
                 }
 
                 // stride 跳过了最后一个采样点就补回来 —— 否则地形右端会缺一截碰撞。
                 if ((sampleCount - 1) % stride != 0)
                 {
                     int last = sampleCount - 1;
-                    top.Add(new Vector2(TopXAt(last), _heights[last] + colliderOffsetY));
-                    bottom.Add(new Vector2(BottomXAt(last), BottomAt(last) + colliderOffsetY));
+                    _colliderTop.Add(new Vector2(TopXAt(last), _heights[last] + colliderOffsetY));
+                    _colliderBottom.Add(new Vector2(BottomXAt(last), BottomAt(last) + colliderOffsetY));
                 }
 
                 // 沿地表从左到右，再沿底部从右到左折回来。顺时针，正是
                 // PolygonCollider2D 对外轮廓的期望方向。
-                outline = new List<Vector2>(top.Count * 2);
-                outline.AddRange(top);
-                for (int i = bottom.Count - 1; i >= 0; i--) outline.Add(bottom[i]);
+                _colliderOutline.AddRange(_colliderTop);
+                for (int i = _colliderBottom.Count - 1; i >= 0; i--) _colliderOutline.Add(_colliderBottom[i]);
             }
             else
             {
                 // 左右边加过控制点、或者底边是独立折线：直接用完整轮廓。
                 // 视觉网格走的是同一个 BuildOutline()，两边不可能分叉。
-                outline = new List<Vector2>();
-                BuildOutline(outline);
+                BuildOutline(_colliderOutline);
 
                 if (colliderOffsetY != 0f)
                 {
-                    for (int i = 0; i < outline.Count; i++)
-                        outline[i] = new Vector2(outline[i].x, outline[i].y + colliderOffsetY);
+                    for (int i = 0; i < _colliderOutline.Count; i++)
+                        _colliderOutline[i] = new Vector2(_colliderOutline[i].x, _colliderOutline[i].y + colliderOffsetY);
                 }
             }
 
-            if (outline.Count < 3)
+            if (_colliderOutline.Count < 3)
             {
                 // 凑不出一个面，说明地形数据坏了。保留上一次的碰撞体，
                 // 别把玩家脚底下的地面撤掉。
                 return;
             }
 
+            // SetPath 只收数组，所以留一份按需增长的副本，不每次 ToArray()。
+            if (_colliderPath.Length != _colliderOutline.Count)
+                _colliderPath = new Vector2[_colliderOutline.Count];
+
+            _colliderOutline.CopyTo(_colliderPath);
+
             _poly.pathCount = 1;
-            _poly.SetPath(0, outline.ToArray());
+            _poly.SetPath(0, _colliderPath);
             _poly.enabled = true;
         }
     }

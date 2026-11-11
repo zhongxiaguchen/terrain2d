@@ -71,6 +71,9 @@ namespace LDK2D
         MeshRenderer _renderer;
         int _lastHash = int.MinValue;
 
+        // 和高度场地形共用同一套持久缓冲区，稳态重建零分配。
+        readonly LDK2DMeshBuffers _meshBuffers = new LDK2DMeshBuffers();
+
         MeshFilter Filter => _filter != null ? _filter : (_filter = GetComponent<MeshFilter>());
         MeshRenderer Renderer => _renderer != null ? _renderer : (_renderer = GetComponent<MeshRenderer>());
 
@@ -120,9 +123,11 @@ namespace LDK2D
         {
             var paths = ReadPaths();
 
-            var verts = new List<Vector3>();
-            var uvs = new List<Vector2>();
-            var tris = new List<int>();
+            _meshBuffers.Begin(0, 0);
+
+            List<Vector3> verts = _meshBuffers.Verts;
+            List<Vector2> uvs = _meshBuffers.Uvs;
+            List<int> tris = _meshBuffers.Tris;
 
             int baseIndex = 0;
 
@@ -155,7 +160,10 @@ namespace LDK2D
                 return;
             }
 
-            _mesh = LDK2DMeshUtil.Build("LDK2DPolygonMesh", _mesh, verts, uvs, tris, flipWinding);
+            // 索引是耳切算出来的，点数相同也不保证索引相同 —— 强制全量重建。
+            _meshBuffers.Invalidate();
+
+            _mesh = LDK2DMeshUtil.Build("LDK2DPolygonMesh", _mesh, _meshBuffers, flipWinding);
             Filter.sharedMesh = _mesh;
             LDK2DMeshUtil.EnsureMaterial(Renderer);
             ApplyVisuals();

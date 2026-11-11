@@ -921,6 +921,9 @@ spacing = 期望的世界宽度 / (采样点数量 - 1)
 - 碰撞体顶点数要控住。不规则轮廓先做抽稀（`colliderStride` 或 Douglas-Peucker）。
 - 角色卡在接缝上：`CompositeCollider2D` + 胶囊碰撞体 + 调 `Contact Offset`。
 - 重建 Mesh 是 CPU 操作，别每帧对大地形调用。改数据后重建一次即可。
+  重建用的缓冲区是**组件持有、反复复用**的（`LDK2DMeshBuffers`），稳态下零托管分配；
+  拓扑没变时还会跳过索引和法线的重传。真正的开销剩下 `PolygonCollider2D.SetPath`
+  —— 它要重建物理形状，交互期间该降频。
 
 ---
 
