@@ -29,7 +29,8 @@ Assets/Terrain2D/
     ├── LDK2DColliderDisplayOverlay.cs 右下角「碰撞体」开关：画出场景里所有碰撞体的轮廓
     ├── LDK2DSceneDepthVisibility.cs   资产替换面板的「场景显示层级」：按 Z 分层开关渲染器
     ├── LDK2DSortingOrderToolbar.cs    左下角固定栏 + 左上角面板（非地形选择时）
-    └── LDK2DSceneToolbarLayout.cs     左下固定栏 / 左上阶段面板的定位与宽度
+    ├── LDK2DSceneToolbarLayout.cs     左下固定栏 / 左上阶段面板的定位与宽度
+    └── LDK2DSceneMinimap.cs           右上角缩略地图：地形剪影 + 角色点位
 ```
 
 依赖：`com.unity.feature.2d`（已装，含 Sprite Shape 9.0.5 / Tilemap Extras 3.1.3）、
@@ -313,6 +314,15 @@ Inspector 底部有 **「进入编辑模式」** 按钮，点一下进入（再�
 阶段状态和选择器的画法在 `Editor/LDK2DTerrainStage.cs`，面板的定位在
 `Editor/LDK2DSceneToolbarLayout.cs`（`Panel()` 会避开 Unity 自带的竖排工具条：
 那块的高度随 2D/3D 模式变，宽度不变，所以往右让而不是往下让）。
+
+**右上角是缩略地图**（`Editor/LDK2DSceneMinimap.cs`）。地形摆到 9 块之后，视口里永远
+只能看到一块，想确认"整体是不是拉得太长""敌人是不是漏在某个角落"只能缩得很小或来回滚。
+这张图把整个场景压成一小块：地形按 `BuildOutline()` 的地表折线画成**剪影**（不是包围盒方框，
+方框看不出坡往哪边倒），角色按种类打点。
+
+范围只算地形、不算"所有 Renderer"——场景里还有一堆当参考图用的 Sprite，算进来会把范围
+撑爆。面板高度按场景长宽比算并夹在 72~150 之间；顶部往下让 6.5 行高，因为 2022.3 的右上角
+被方向指示器和叠加工具条占着。**纯展示，不接受任何输入。**
 
 **搭建阶段**
 
