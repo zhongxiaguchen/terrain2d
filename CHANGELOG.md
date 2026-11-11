@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-11
+
+### Added
+
+- **AI 实时协作通道：外部进程可以在编辑器跑着的时候直接改关卡**
+  （新文件 `Editor/LDK2DLiveBridge.cs`，配套 `LDK2DLive/` 目录）。
+
+  这是"AI 参与关卡编辑"的地基。之前 AI 想改地形只有一条路 —— 改 C# 代码，
+  然后切回 Unity 等编译。一次就是一次域重载，Play 会断，实时性归零。
+
+  现在走文件：外部往 `LDK2DLive/commands.jsonl` 追加一行 JSON，编辑器 16ms 内取走、
+  应用、再往 `events.jsonl` 写一条回执。**没有编译，没有重启，Play 里也能用。**
+
+  | 文件 | 谁写 | 内容 |
+  |---|---|---|
+  | `commands.jsonl` | 外部 → 编辑器 | 一行一条补丁 |
+  | `events.jsonl` | 编辑器 → 外部 | 一行一个事件 |
+  | `state.json` | 编辑器 | 全量快照，改动后 500ms 内刷新 |
+  | `heartbeat.json` | 编辑器 | 每秒一次，看它活着没有 |
+  | `cursor.json` | 编辑器 | 读到哪了，防重放 |
+
+  **补丁的粒度是「哪块地形、哪个区间、什么值」，不是「重新生成整块地形」。**
+  这条决定了它为什么快：不重建拓扑、不重算噪声，只改一段高度数组。
+
+  支持的 op：`patch` / `flatten` / `raise` / `dig` / `smooth` / `generate` /
+  `set` / `spawn` / `remove` / `describe`。
+
+- **双向：编辑器也会把编辑现场推出去。**
+
+  每块地形加了 `Revision` 计数器（每次 `Rebuild()` +1）。桥接层只比这个数字
+  （O(1)），变了才 diff 出改动的区间。所以**人拖、AI 改、Inspector 改，走的都是
+  同一条路径**，不需要谁去通知谁。
+
+  事件流按地形节流到 10Hz；停手 200ms 后补一条 `settle` —— 那是"现在可以安全地改"
+  的信号。`settle` 之前会先把 `state.json` 刷一遍，保证外部读到的快照和这条事件同帧。
+
+- **参考代理 `LDK2DLive/agent.mjs`**：盯 `settle`，跑一遍「最大可行坡角」约束，
+  把太陡的地方削平，只发改动区间的补丁。它是这条通道的参考实现 ——
+  真接大模型时，替换掉 `decide()` 一个函数就行。
+
+- **命令行工具 `LDK2DLive/send.mjs`**：发命令、看事件、看快照、看心跳。
+
+### Changed
+
+- `LDK2DHeightmapTerrain` 新增三个公开成员：
+  `Revision`（改动指纹）、`IsInteractive`（是否正在拖）、
+  `SetHeightsRange(start, values)`（外部补丁入口，越界自动夹取）。
+
+### 设计约束
+
+- **每帧最多花 2ms**（`FrameBudgetMs`）。外部发 1 条还是 500 条，编辑器都不会掉帧，
+  只是生效得慢一点。这是"几乎无卡顿"的唯一硬保证。
+- **人正在拖的地形，AI 的补丁进等待队列**，松手才应用。判据是 `IsInteractive`，
+  不是"最近谁动过"。
+- **一条命令 = 一步撤销**（`Undo.IncrementCurrentGroup` 只在真要改东西时调）。
+- **`set` 有字段白名单**。名字 / 层级 / transform 故意不给改 —— 改了会让外部手里
+  那个 `id` 当场失效，下一批命令全部打空。
+
+### Notes
+
+- 通道默认**常开**，没有开关。它只读一个文件的长度、写几个小文件，开销可以忽略。
+- Play 模式下改的是运行时副本，要留下来仍需勾「实时编辑」（见 0.18.0）。
+- 协议说明见 `LDK2DLive/README.md`。
+
+
 ## [0.18.2] - 2026-11-11
 
 ### Changed
