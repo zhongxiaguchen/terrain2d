@@ -152,6 +152,8 @@ namespace LDK2D.EditorTools
                                          EditorStyles.miniButton))
                         EditorApplication.ExecuteMenuItem(CreatePlayerMenu);
 
+                    DrawLiveEditRow();
+
                     // 占位标记：不管有没有选中地形，测试阶段都能造。
                     // 在搭关卡的时候人经常什么都不选（刚按完 Esc），要是非得先点一块
                     // 地形才能造敌人，这个入口就白放了。
@@ -583,6 +585,34 @@ namespace LDK2D.EditorTools
                 }
             }
 
+            SceneView.RepaintAll();
+        }
+
+        /// <summary>
+        /// 一行「实时编辑」勾选框。
+        ///
+        /// 它管的只有一件事：**Play 模式下改的东西，退出后要不要留下来**。
+        /// 进不进 Play 不归它管 —— 编辑器自带播放键，再放一套只会打架。
+        ///
+        /// 关着的时候 Play 里连地形手柄都不画（`LDK2DHeightmapTerrainEditor.OnSceneGUI`
+        /// 开头那道门禁），所以不会出现「改了半天退出全没了」这种事 —— 根本改不了。
+        ///
+        /// 放在「创建测试角色」下面：它是测试装备的一部分，和摄像机模式一样，
+        /// 都是"这次怎么测"的设置。
+        /// </summary>
+        static void DrawLiveEditRow()
+        {
+            bool liveEdit = LDK2DTerrainStage.LiveEdit;
+
+            bool picked = EditorGUILayout.ToggleLeft(
+                new GUIContent("实时编辑", "Play 模式下保留地形手柄，退出 Play 时把改动写回场景。"),
+                liveEdit, EditorStyles.miniLabel);
+
+            if (picked == liveEdit) return;
+
+            LDK2DTerrainStage.LiveEdit = picked;
+
+            // 视口要立刻跟着变：勾上 → 手柄出现，取消 → 手柄消失。
             SceneView.RepaintAll();
         }
 

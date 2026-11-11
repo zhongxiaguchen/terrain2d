@@ -89,7 +89,7 @@ namespace LDK2D.EditorTools
             DrawToggleRow();
 
             // ---- 碰撞体显示 ----
-            // 和视口右下角那颗按钮是**同一个状态**，不存在两处打架。
+            // 这里是**唯一**入口，视口右下角不再放按钮。
             bool showColliders = GUILayout.Toggle(
                 LDK2DColliderDisplayOverlay.Show, "显示碰撞体",
                 EditorStyles.miniButton, GUILayout.Width(96f));

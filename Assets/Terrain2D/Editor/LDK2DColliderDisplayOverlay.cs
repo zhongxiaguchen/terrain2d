@@ -5,11 +5,14 @@ using UnityEngine;
 namespace LDK2D.EditorTools
 {
     /// <summary>
-    /// 视口右下角的「碰撞体」开关：把场景里**实际生效的碰撞轮廓**画出来。
+    /// 把场景里**实际生效的碰撞轮廓**画出来。
     ///
     /// 为什么需要它：Unity 自己的碰撞体 Gizmo 受 Gizmos 总开关、层级可见性、
     /// 以及 2D/3D 模式影响，而且在深色地面上几乎看不见。排查"走过去突然没碰撞了"
     /// 的时候，最想知道的就是**碰撞轮廓到底画到哪、有没有把整块包住**。
+    ///
+    /// 开关在「场景显示层级」面板里（<see cref="LDK2DSceneDepthVisibility"/>）。
+    /// **视口里没有按钮** —— 右下角那块留给视口缩放滑条了。
     ///
     /// 画的范围是**场景里所有 Collider2D**，不只是地形 —— 敌人 / NPC / 奖励点的
     /// 碰撞盒也一并画出来，这样"这块地方为什么走不过去"能一眼看到底是谁挡的。
@@ -44,8 +47,8 @@ namespace LDK2D.EditorTools
         static readonly List<Vector3> _line = new List<Vector3>(256);
 
         /// <summary>
-        /// 显示开关。视口右下角的按钮和资产替换面板里的勾选框**共用这一个状态** ——
-        /// 两处入口控制同一件事，不会出现"面板里关掉了但右下角还亮着"。
+        /// 显示开关。唯一入口是「场景显示层级」面板里的勾选框
+        /// （`LDK2DSceneDepthVisibility`）。
         /// </summary>
         public static bool Show
         {
@@ -82,40 +85,6 @@ namespace LDK2D.EditorTools
             if (Event.current == null) return;
 
             if (_show) DrawColliders();
-
-            DrawToggle(view);
-        }
-
-        /// <summary>右下角那颗开关。位置跟着 UI Scale 走，不用写死的像素值。</summary>
-        static void DrawToggle(SceneView view)
-        {
-            const float width = 86f;
-            float height = EditorGUIUtility.singleLineHeight + 10f;
-
-            Rect rect = new Rect(
-                view.position.width - width - LDK2DSceneToolbarLayout.SideInset,
-                view.position.height - height - LDK2DSceneToolbarLayout.BottomInset,
-                width,
-                height);
-
-            Handles.BeginGUI();
-
-            GUILayout.BeginArea(rect);
-            GUILayout.BeginVertical("box");
-
-            bool now = GUILayout.Toggle(
-                _show, "碰撞体", EditorStyles.miniButton,
-                GUILayout.Height(EditorGUIUtility.singleLineHeight));
-
-            GUILayout.EndVertical();
-            GUILayout.EndArea();
-
-            Handles.EndGUI();
-
-            if (now == _show) return;
-
-            Show = now;
-            view.Repaint();
         }
 
         static void DrawColliders()
