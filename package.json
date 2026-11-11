@@ -4,6 +4,10 @@
   "displayName": "Terrain 2D",
   "description": "Editable 2D ground for Unity. An equal-spacing height field with a per-X height query, four independently editable edges (top / bottom / left / right), surface-following UVs for constant texel density on slopes, runtime destruction, seeded procedural generation, and automatic mesh + collider generation. A three-stage viewport toolbar walks the level through blockout, testing, and asset handoff, and ships with a controllable test character. Aimed at platformers that need destructible or procedurally generated terrain.",
   "unity": "2022.3",
+  "unityRelease": "53f1",
+  "documentationUrl": "https://github.com/zhongxiaguchen/terrain2d#readme",
+  "changelogUrl": "https://github.com/zhongxiaguchen/terrain2d/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/zhongxiaguchen/terrain2d/blob/main/LICENSE.md",
   "keywords": [
     "2d",
     "terrain",
@@ -13,9 +17,11 @@
     "platformer",
     "heightmap",
     "level-design",
+    "mesh-generation",
     "uv",
     "texel-density",
-    "platformer"
+    "unity-2d",
+    "urp"
   ],
   "author": {
     "name": "zhongxiaguchen"

@@ -20,6 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   改成 `LDK2DMenuItems.CreateTerrain`，并在注释里写清它挂在哪个类上。
 
+### Changed
+
+- **补全 `package.json` 的发布字段**：`unityRelease` / `documentationUrl` /
+  `changelogUrl` / `licensesUrl`。三个链接按**仓库根**写 —— 远程仓库里包就在根目录，
+  `CHANGELOG.md` 不在 `Assets/Terrain2D/` 下面。
+- **关键词去重并补充**：`platformer` 原来出现了两次；新增 `mesh-generation`、
+  `unity-2d`、`urp`。
+- **清掉 CHANGELOG 末尾 8 行 `CHANGE_ME` 占位链接**。那些 `compare/v0.5.3...v0.6.0`
+  指向不存在的 tag，点开必然 404。
+
 ## [0.20.0] - 2026-11-11
 
 ### Added
@@ -1326,12 +1336,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   case, or leave the object selected.
 - Verified on Unity 2022.3.53f1 with URP 14 (2D Renderer).
 
-[Unreleased]: https://github.com/CHANGE_ME/terrain2d/commits/main
-[0.6.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.5.3...v0.6.0
-[0.5.1]: https://github.com/CHANGE_ME/terrain2d/compare/v0.5.0...v0.5.1
-[0.5.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.3.1...v0.4.0
-[0.3.1]: https://github.com/CHANGE_ME/terrain2d/compare/v0.3.0...v0.3.1
-[0.3.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.1.1...v0.2.0
-[0.1.1]: https://github.com/CHANGE_ME/terrain2d/compare/v0.1.0...v0.1.1
+[Unreleased]: https://github.com/zhongxiaguchen/terrain2d/commits/main
