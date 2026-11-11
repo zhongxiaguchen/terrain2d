@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-11-11
+
+### Fixed
+
+- **0.20.0 的 `create` 命令编译不过**（`Editor/LDK2DLiveBridge.cs`）。
+
+  `DoCreate` 调的是 `LDK2DToolsEditor.CreateTerrain`，但项目里没有
+  `LDK2DToolsEditor` 这个类 —— `CreateTerrain` 挂在 `LDK2DMenuItems` 上，
+  也就是 `LDK2DToolsEditor.cs` 文件里**第三个**类（第 2191 行起，方法在第 2389 行）。
+  按文件名猜类名会得到 CS0103。
+
+  改成 `LDK2DMenuItems.CreateTerrain`，并在注释里写清它挂在哪个类上。
+
 ## [0.20.0] - 2026-11-11
 
 ### Added

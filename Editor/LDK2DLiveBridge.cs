@@ -697,9 +697,13 @@ namespace LDK2D.EditorTools
         /// 新建一块地形。这是「AI 从零搭关卡」缺的那块拼图 —— 只能改已有地形的话，
         /// 空地上什么都建不出来。
         ///
-        /// 创建逻辑直接复用工具栏那个 <see cref="LDK2DToolsEditor.CreateTerrain"/>，
+        /// 创建逻辑直接复用菜单里那个 LDK2DMenuItems.CreateTerrain，
         /// 不另写一份 —— 否则"面板能做的 AI 做不到"，两边行为会慢慢分叉。
         /// 唯一的区别是位置：工具栏摆在视口中心，这里按命令给的坐标摆。
+        ///
+        /// 注意它挂在 <c>LDK2DMenuItems</c> 上，不在 <c>LDK2DHeightmapTerrainEditor</c> 上 ——
+        /// 后者是 <c>LDK2DToolsEditor.cs</c> 里第一个类的名字，而方法在文件末尾那个
+        /// 静态类里。按文件名猜类名会得到 CS0117。
         /// </summary>
         static Result DoCreate(Command cmd)
         {
@@ -713,7 +717,7 @@ namespace LDK2D.EditorTools
 
             BeginUndo();
 
-            LDK2DHeightmapTerrain terrain = LDK2DToolsEditor.CreateTerrain(null);
+            LDK2DHeightmapTerrain terrain = LDK2DMenuItems.CreateTerrain(null);
             if (terrain == null)
             {
                 Fail(cmd, "创建地形失败");
