@@ -11,56 +11,71 @@ namespace LDK2D
     internal static class LDK2DMeshUtil
     {
         /// <summary>
-        /// 用给定缓冲区填充并返回 <paramref name="mesh"/>。
+        /// 用 <paramref name="buf"/> 里的数据填充并返回 <paramref name="mesh"/>。
         /// 2D 网格朝 -Z，和 SpriteRenderer 生成的一致，这样 URP 2D 渲染器下的
         /// Sprite-Lit 类着色器表现和精灵完全一样。
         /// </summary>
-        public static Mesh Build(string name, Mesh mesh,
-                                 List<Vector3> verts,
-                                 List<Vector2> uvs,
-                                 List<int> tris,
-                                 bool flipWinding)
+        public static Mesh Build(string name, Mesh mesh, LDK2DMeshBuffers buf, bool flipWinding)
         {
+            int vertCount = buf.Verts.Count;
+            int triCount = buf.Tris.Count;
+
+            // 拓扑没变 → 索引一模一样，不用清网格，也不用重传索引和法线。
+            // 还要确认网格自己的顶点数没被别处清过（PolygonMesh 没有可画轮廓时会 Clear）。
+            bool reuseTopology =
+                mesh != null &&
+                buf.LastVertCount == vertCount &&
+                buf.LastTriCount == triCount &&
+                buf.LastFlip == flipWinding &&
+                mesh.vertexCount == vertCount;
+
             if (mesh == null)
             {
                 mesh = new Mesh { name = name, hideFlags = HideFlags.DontSave };
             }
-            else
+            else if (!reuseTopology)
             {
                 mesh.Clear();
                 mesh.name = name;
             }
 
-            mesh.indexFormat = verts.Count > 65000
+            mesh.indexFormat = vertCount > 65000
                 ? IndexFormat.UInt32
                 : IndexFormat.UInt16;
 
-            if (flipWinding)
-            {
-                for (int i = 0; i + 2 < tris.Count; i += 3)
-                {
-                    int t = tris[i];
-                    tris[i] = tris[i + 1];
-                    tris[i + 1] = t;
-                }
-            }
+            // 先传顶点再传索引：Clear() 之后顶点数是 0，先设索引会被判成越界。
+            mesh.SetVertices(buf.Verts);
+            mesh.SetUVs(0, buf.Uvs);
 
-            mesh.SetVertices(verts);
-            mesh.SetUVs(0, uvs);
-            mesh.SetTriangles(tris, 0);
-
-            var normals = new List<Vector3>(verts.Count);
-            var tangents = new List<Vector4>(verts.Count);
-            for (int i = 0; i < verts.Count; i++)
+            if (!reuseTopology)
             {
-                normals.Add(Vector3.back);
-                tangents.Add(new Vector4(1f, 0f, 0f, -1f));
+                if (flipWinding) FlipWinding(buf.Tris);
+
+                mesh.SetTriangles(buf.Tris, 0);
+
+                buf.EnsureConstants(vertCount);
+                mesh.SetNormals(buf.Normals);
+                mesh.SetTangents(buf.Tangents);
             }
-            mesh.SetNormals(normals);
-            mesh.SetTangents(tangents);
 
             mesh.RecalculateBounds();
+
+            buf.LastVertCount = vertCount;
+            buf.LastTriCount = triCount;
+            buf.LastFlip = flipWinding;
+
             return mesh;
+        }
+
+        /// <summary>把三角形绕序翻过来。原地改，不分配。</summary>
+        static void FlipWinding(List<int> tris)
+        {
+            for (int i = 0; i + 2 < tris.Count; i += 3)
+            {
+                int t = tris[i];
+                tris[i] = tris[i + 1];
+                tris[i + 1] = t;
+            }
         }
 
         /// <summary>
