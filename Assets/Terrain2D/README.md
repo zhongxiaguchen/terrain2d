@@ -230,6 +230,40 @@ every 100 ms (`InteractiveColliderInterval`), with one final catch-up on mouse-u
 `PolygonCollider2D.SetPath` rebuilds the physics shape, which is by far the most expensive
 part of a terrain rebuild. Set the interval to `0f` to disable the throttling.
 
+## Live AI collaboration (external process edits the level)
+
+`Editor/LDK2DLiveBridge.cs` plus a `LDK2DLive/` folder at the project root. It starts
+automatically with the editor — no toggle, no button.
+
+The point: an AI used to have exactly one way to change terrain — edit C#, then wait for
+Unity to recompile. That's a domain reload, Play mode dies, real-time is gone. Now it
+appends one JSON line to `LDK2DLive/commands.jsonl` and the editor picks it up within 16 ms:
+
+```jsonc
+{"op":"patch","target":"/Terrain_A","start":40,"values":[1.2,1.4,1.6]}
+```
+
+The editor pushes the other way too: `events.jsonl` gets a `settle` event 200 ms after you
+stop dragging, which is the "safe to edit now" signal.
+
+| File | Written by | Contents |
+|---|---|---|
+| `commands.jsonl` | external → editor | one patch per line |
+| `events.jsonl` | editor → external | one event per line |
+| `state.json` | editor | full snapshot including the height array |
+| `heartbeat.json` | editor | once a second, liveness |
+
+Patches are addressed as *"this terrain, this index range, these values"* — never
+*"regenerate the terrain"*. That's why it's fast: no topology rebuild, no noise pass, just
+a slice of the height array.
+
+Three hard rules: **2 ms per frame** budget (send 1 command or 500, the editor won't drop a
+frame), **patches queue while you drag** that terrain, and **one command = one Ctrl+Z**.
+
+To watch the loop close, double-click `LDK2DLive/start-agent.bat`, then drag a terrain point
+into a spike and let go — the spike flattens itself about 200 ms later. Protocol reference:
+`LDK2DLive/README.md` (Chinese).
+
 ## Known limitations
 
 - The surface cannot overhang (see above).

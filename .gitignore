@@ -56,3 +56,10 @@ desktop.ini
 # 注意：Assets/ 和 Packages/ 下的 *.meta 必须提交！
 # 只拷 .cs 不拷 .meta 会让 Unity 生成新 GUID，场景里的引用就全断了。
 !/[Aa]ssets/**/*.meta
+
+# ---------------------------------------------------------------- 实时协作通道的运行时文件
+# 协议脚本（agent.mjs / send.mjs / start-agent.bat / README）要提交，
+# 但这些是每次编辑实时产生的，不该进版本库。
+LDK2DLive/*.jsonl
+LDK2DLive/*.json
+LDK2DLive/*.log

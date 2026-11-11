@@ -219,6 +219,13 @@ namespace LDK2D
         bool _colliderDirty;
         float _lastColliderTime = -1f;
 
+        // ---- 外部改动计数 ----
+        //
+        // 每次 Rebuild() 都 +1。AI 桥接层（Editor/LDK2DLiveBridge）靠它判断
+        // "这块地形被人或 AI 动过了"，不用每帧去比整个高度数组。
+        // 纯粹是个观察点，不参与重建逻辑，也不序列化。
+        int _revision;
+
         // 地表 X 是否严格递增。自由横拖可以把某个点的 X 拖过它的邻居，那样二分查找
         // 就不成立了。SampleHeight 可能被寻路/刷怪每帧调用，所以结果缓存起来，
         // 只在形状变化（Rebuild / 拖点）时失效。
@@ -246,6 +253,48 @@ namespace LDK2D
         public float[] BottomHeights
         {
             get { EnsureBottomHeights(); return _bottomHeights; }
+        }
+
+        /// <summary>
+        /// 重建次数。任何一次 <see cref="Rebuild"/> 都会 +1。
+        ///
+        /// 给外部层（AI 桥接、存档差异、自动化测试）当"改动指纹"用 ——
+        /// 比每帧比较整个高度数组便宜得多，而且不用管是谁改的。
+        /// </summary>
+        public int Revision { get { return _revision; } }
+
+        /// <summary>
+        /// 当前是不是正被交互式编辑（拖点中）。碰撞体降频期间为 true。
+        /// 外部命令层靠它判断"现在能不能安全写入"。
+        /// </summary>
+        public bool IsInteractive { get { return _interactive; } }
+
+        /// <summary>
+        /// 只改一段地表高度，然后重建一次。
+        ///
+        /// 这是给外部命令层（AI 补丁）用的入口。补丁的粒度是「哪个区间、什么值」，
+        /// 不是「重新生成整块地形」—— 后者一次就是全量重建，谈不上实时。
+        ///
+        /// 越界的下标会被夹掉（不会抛异常），所以 AI 算错区间最多是"没改到"，
+        /// 不会把地形写坏。
+        /// </summary>
+        public void SetHeightsRange(int start, float[] values)
+        {
+            if (values == null || values.Length == 0) return;
+
+            EnsureHeights();
+
+            int s = Mathf.Clamp(start, 0, _heights.Length - 1);
+            int count = Mathf.Min(values.Length, _heights.Length - s);
+
+            for (int i = 0; i < count; i++)
+            {
+                float v = values[i];
+                if (float.IsNaN(v) || float.IsInfinity(v)) continue;
+                _heights[s + i] = v;
+            }
+
+            Rebuild();
         }
 
         /// <summary>取某个采样点处的底部高度。没开独立轮廓时就是 bottomY。</summary>
@@ -1294,6 +1343,10 @@ namespace LDK2D
             }
 
             ApplyVisuals();
+
+            // 改动指纹。放在最后 —— 外部层看到 Revision 变了，就说明这一帧
+            // 的网格和碰撞体已经全部落盘了，可以直接读 Heights。
+            _revision++;
         }
 
         /// <summary>
