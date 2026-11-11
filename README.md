@@ -136,15 +136,21 @@ the walkable surface exactly as it was.
 
 ## Colliders
 
-Two colliders, both generated from the same outline as the mesh:
+One collider, generated from the same outline as the mesh:
 
 | Setting | Default | |
 |---|---|---|
 | `buildColliders` | on | master switch |
-| `buildEdgeCollider` | **on** | one open chain along the surface. Cheap, and the right choice for a platformer's one-way ground |
-| `buildPolygonCollider` | off | the full closed outline. Turn it on when you need to collide from below or from the side — a floating island, for instance |
+| `colliderOffsetY` | 0 | push the collider edge away from the visual edge |
+| `colliderStride` | 1 | take every Nth sample; only worth raising on very long terrain |
 
-Note that turning a collider off disables the component rather than deleting it.
+The collider is a single closed `PolygonCollider2D` covering the whole body (surface, right
+chain, bottom, left chain) — solid from every direction. It used to be an open `EdgeCollider2D`
+along the surface only, which had no inside or outside and broke wherever the surface folded
+back on itself. That path is gone.
+
+Note that turning the collider off disables the component rather than deleting it, and any
+leftover `EdgeCollider2D` from an older version is disabled automatically.
 
 ## The other component: PolygonMesh2D
 

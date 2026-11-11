@@ -39,6 +39,18 @@ namespace Terrain2D.EditorTools
         }
 
         /// <summary>
+        /// 资产替换面板底部追加的内容，由 <c>SceneDepthVisibility</c> 在域加载时挂上来。
+        ///
+        /// 为什么不直接调用：`Terrain2DToolsEditor` 这个文件比
+        /// `SceneDepthVisibility` 老，**旧文件引用新类型**会在 Unity 增量编译
+        /// 「先编译、后导入」的那一轮报 `does not contain a definition`。
+        /// 把委托放在这个两边都已经引用的中立类上，新旧文件就都只引用旧类型了。
+        ///
+        /// 为 null 时面板照常绘制，只是少了这一段。
+        /// </summary>
+        public static System.Action AssetPanelExtra;
+
+        /// <summary>
         /// 铺满视口、底部留出 <see cref="BottomInset"/> 的区域。
         /// 调用方自己负责 GUILayout.BeginArea / EndArea。
         /// </summary>

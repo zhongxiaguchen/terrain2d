@@ -7,6 +7,252 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-11
+
+### Added
+
+- **资产替换阶段多了「场景显示层级」**（`Editor/SceneDepthVisibility.cs`）。
+
+  位置是**「什么都没选」时的左上角面板**（`SortingOrderToolbar.DrawStageActionPanel`
+  的资产替换分支），不是选中地形的那块。理由：它管的是**整个场景**的显隐，和选中哪块
+  地形无关；而且人检查整体效果时通常什么都不选，放进选中地形的面板等于要先点一块地形
+  才能看整层，多绕一步。选中地形时那块面板保持原样（7 行 UV / 材质）。
+
+  按 `transform.position.z` 筛出这个 Z 上的渲染器，统一显示 / 隐藏：
+
+  ```
+  场景显示层级
+  Z [0      ] ▾
+  24 个    [显示]
+  [ ] 显示碰撞体
+  场景里的 Z：-1、0、0.5
+  关层级只关渲染器，碰撞体始终保留。
+  ```
+
+  **Z 由人指定，不自动扫描。** 两种给法：
+
+  - 输入框直接输，默认 `0`（存 `EditorPrefs` 的 `Terrain2D.TargetZ`，跨重启）
+  - 点 `▾` 从 `DepthPresets` 里选已经保存的命名 Z（「地形 (0)」这种）——
+    和「层级 / Z」那一行用的是**同一张预设表**，存过的"背景 / 地面 / 前景"直接复用
+
+  为什么不自动列出所有 Z：场景里拖出来的 Z 常常是 `0.5001` / `0.25` / `0.0499` 这种碎值，
+  自动分组会冒出一长串没人认识的层。而层级本来就是设计时定好的档位，`DepthPresets`
+  里已经存着了。面板底部仍然把场景里实际存在的 Z 列成一行**只读**参考
+  （最多 6 个，多的用 `…` 收掉），省得靠猜该输什么。
+
+  点一下开关就把这个 Z 上的渲染器统一打开或关掉；一个都没匹配到时开关置灰，
+  左边显示 `0 个`。
+
+  **只写 `Renderer.enabled`，碰撞体一个字都不碰。** 关掉一层是为了看清下面那层在画什么；
+  如果连碰撞一起关掉，就会变成"我明明关了背景，角色却掉下去了" —— 物理和视觉必须是两件事。
+
+  Z 用**世界坐标**比较，不是 `localPosition`：物体挂到带偏移的父物体下面时，
+  `localPosition` 和眼睛看到的层次对不上。比较容差 `0.005`（半个 0.01），
+  手拖出来的 `0.5001` 和 `0.5` 算同一层。
+
+- **「碰撞体」的显示范围从「只有地形」扩大到「场景里所有 `Collider2D`」**
+  （`Editor/ColliderDisplayOverlay.cs`）。
+
+  排查"这块地方为什么走不过去"的时候，光看地形轮廓不够 —— 还得知道是不是某个敌人 /
+  NPC / 奖励点的碰撞盒挡在那儿。现在按类型分色：
+
+  | 颜色 | 含义 |
+  |---|---|
+  | 橙黄 | `PolygonCollider2D`（地形体块，实心） |
+  | 青色 | `BoxCollider2D`（角色 / 占位标记） |
+  | 品红 | `EdgeCollider2D`（旧版本残留的开链，两端各画十字） |
+  | 灰蓝 | 触发器（`isTrigger`，不挡人） |
+  | 暗红 | 组件被禁用（视觉还在、物理是空的） |
+
+  `BoxCollider2D` 的 `size` / `offset` 是**本地**值，交给 `TransformPoint` 去乘缩放 ——
+  占位标记的尺寸是靠 `transform.localScale` 给的，直接拿 size 画会错。
+
+  禁用的 `EdgeCollider2D` 仍然不画：地形换成体块碰撞之后它只可能是历史残留，
+  画出来只会跟体块轮廓混在一起。
+
+  开关状态还是同一个 `EditorPrefs` key（`Terrain2D.ShowColliders`）。视口右下角的按钮和
+  资产替换面板里的勾选框控制的是**同一个状态**，不会出现"面板里关了但右下角还亮着"。
+
+- **Z 预设现在能删了**（`Editor/DepthPresets.cs`）。
+
+  下拉菜单底部多了「删除预设 ▸」子菜单，列出所有存过的名字，点一个删一个；最后一项
+  「全部清空」会先弹确认框。
+
+  删除收进子菜单而不是和"选一个"平铺：数据在 `EditorPrefs` 里，**删了没有撤销**，
+  误点一下就把存好的档位删掉，代价太大。
+
+  这个菜单是共用的 —— 「层级 / Z」那一行和资产替换面板的「场景显示层级」都走
+  `DepthPresets.ShowMenu`，所以两处都能删。
+
+- **「选中非地形物体」面板的碰撞体开关，没有碰撞体时也能开了**
+  （`Editor/SortingOrderToolbar.cs`）。
+
+  以前没有碰撞体时这颗按钮是 `EditorGUI.DisabledScope` 里的灰色开关 —— 摆着不能动，
+  等于没做。摆关卡时给背景装饰临时补个碰撞盒是很常做的事，不该逼人回 Inspector。
+
+  现在**永远是同一颗 `Toggle`**，和地形层的 `SetCollisionEnabled` 一个心智：
+
+  - **勾上** → 缺 `Collider2D` 的补一个 `BoxCollider2D`，然后统一 `enabled = true`
+  - **取消** → 只 `enabled = false`，**组件留在物体上**，不删
+
+  不删是有意的：摆关卡时经常要临时让某个装饰物"能挡 / 不能挡"来回试，删了再想加回来
+  得重新调尺寸和偏移，一来一回就把节奏打断了。而且地形层也是这么做的 —— 两块面板的
+  开关行为一致，人才不用记两套规则。
+
+  也没有按"当前有没有碰撞体"换成另一种控件（比如 `+ 碰撞体`）：换控件会让这一行在
+  点下去的一瞬间跳一下，还得多记一个按钮的位置。
+
+  补出来的 `BoxCollider2D` 的 `size` / `offset` 取自渲染器的 `localBounds`
+  （本地空间，和 `Collider2D` 是同一套坐标，不用乘缩放）；`localBounds` 是 0 时
+  兜底成 1×1，否则碰撞盒尺寸是 0，在视口里点都点不到。
+
+  只加 `BoxCollider2D`：最通用也最可预测，Sprite 和 Mesh 都适用。形状不贴的场合
+  （多边形网格）自己在 Inspector 里换成 `PolygonCollider2D` —— 面板给的是
+  "有个碰撞体"，不是"猜你要哪种"。
+
+  加不上时会 `Debug.LogWarning`：物体上已经有 3D 碰撞体时 Unity 拒绝加 2D 的，
+  而 `Undo.AddComponent` 失败是返回 `null` 而不是抛异常。
+
+  `AllCollidersEnabled()` 现在要求**每个选中的物体都有碰撞体且都开着**才算"开"。
+  以前只看已有的那些碰撞体是不是全 `enabled` —— 多选时只要有一个物体身上没碰撞体，
+  开关照样显示"开"，实际那个物体是穿得过去的。点一下（变成关）再点一下（变成开）
+  才补得出来。
+
+### Fixed
+
+- **选中被隐藏的物体时，左上角面板会整块消失。**
+
+  `SortingOrderToolbar.RebuildSelection` 原来把 `!renderer.enabled` 的物体过滤掉了。
+  以前没人在编辑器里批量隐藏渲染器，这个过滤等于没有影响；现在按 Z 分层隐藏成了常规操作，
+  隐藏一层之后再选中里面的东西就变成"选中了、但面板是空的"，看着像坏了。
+
+  改成只要物体上有 `Renderer` 就收进来 —— 层级 / Z / 颜色对这些物体照样有意义。
+
+## [0.6.0] - 2026-11-11
+
+### Changed (breaking)
+
+- **碰撞体改成整个体块的 `PolygonCollider2D`，删掉 `EdgeCollider2D` 那条开链。**
+
+  旧的边缘碰撞是沿地表的一条**开链**：没有内外之分，从下方、侧面都能穿进去；
+  地表一旦有折（相邻采样点的 X 反过来 —— 横向拖动就会造成），链会在折的地方断开，
+  表现就是"走一半突然没有碰撞体了"。而视觉网格一直是用 `BuildOutline()` 铺的
+  完整轮廓，两套点从根上就不是一回事。
+
+  现在 `BuildColliders()` 只生成一条闭合轮廓，点来自 `BuildOutline()`（没有左右链、
+  没有独立底边、也没有横向拖动时，走"采样点直铺"的等价路径，省掉耳切）。
+  碰撞和渲染共用同一份数据，不可能再分叉。
+
+  删掉的公开字段：`buildEdgeCollider`、`edgeRadius`、`buildPolygonCollider`。
+  保留 `buildColliders`（总开关）、`colliderOffsetY`、`colliderStride`。
+  场景里已经挂着的旧 `EdgeCollider2D` 会被自动禁用（不销毁，方便对照）。
+
+- Inspector 的「碰撞」区从 6 行缩到 3 行：生成碰撞体 / 碰撞体垂直偏移 / 碰撞体采样间隔。
+
+### Fixed
+
+- **物体上挂着 3D 碰撞体时，`BuildColliders()` 抛 NullReferenceException，整块地形没有碰撞。**
+
+  `AddComponent<EdgeCollider2D>()` 在物体已经挂着 `MeshCollider` 时会失败并返回 `null`
+  （Unity 不允许 2D 和 3D 碰撞体共存），而下一行 `_edge.edgeRadius = edgeRadius;` 直接 NRE，
+  **把整个 `Rebuild()` 打断**。表现是那块地形完全没有碰撞、走过去直接掉下去，
+  而 Inspector 上一点异常都看不出来。
+
+  现场：`高度场地形 (2)`，Console 里只有一句
+  `Can't add component 'EdgeCollider2D' to 高度场地形 (2) because it conflicts with the
+  existing 'MeshCollider' derived component!`，后面跟着 3 次 NRE。
+
+  现在 `AddComponent` 之后判空，失败时用 `Debug.LogWarning` 把原因和该删哪个组件说清楚，
+  然后安全退出，不再打断 Rebuild。
+
+- **在加入行为逻辑之前创建的敌人，按 Play 只有碰撞、一动不动。**
+
+  旧版本的物理配置写在 `Create()` 里，只在"从工具栏创建"那一刻执行一次。
+  已经躺在场景里的敌人身上只有 `TestActor2D`，没有 `Rigidbody2D`、也没有
+  `TestEnemy2D` —— Play 之后自然只有一坨碰撞，没有行为。
+
+  现在 `EnsurePhysics()` 是**幂等**的：缺什么补什么，已经有的不动，并在
+  `TestActor2D.OnEnable()` 里跑一遍。老场景不用手动重建，重新编译一次就补齐了。
+  只有**刚补上的** `TestEnemy2D` 才按 `typeName` 反推行为（飞行 / 射击 / 静止，
+  其余算巡逻），已经在的不会重置 —— 免得每次域重载把人在 Inspector 里调过的值吃掉。
+
+  顺带两处：
+
+  - `PhysicsMaterial2D` 改成只在 Play 模式下赋。它是运行时 `new` 出来的
+    （`HideAndDontSave`），编辑模式下塞给组件会被写进场景再丢成空引用，每次
+    重编译都把场景标脏 —— 和 `TestPlayer2D` 的处理保持一致。
+  - `TestEnemy2D` 加了 `OnValidate`，在 Inspector 里把行为改成「飞行」时顺手把
+    `gravityScale` 归零。不然改完一 Play 它照样往下掉，看着像没生效。
+
+- **NPC 和奖励点（金币等）被错挂上 `Rigidbody2D` + `TestEnemy2D`。**
+
+  `Create()` 原来是「先 `AddComponent`，后赋 `kind`」：
+
+  ```csharp
+  var actor = go.AddComponent<TestActor2D>();   // OnEnable 在这里同步跑完了
+  actor.kind = kind;                            // 之后才赋值
+  ```
+
+  `TestActor2D` 带 `[ExecuteAlways]`，`new GameObject` 出来又是激活的，所以
+  `AddComponent` 那一刻 `OnEnable → EnsurePhysics()` 就执行了，**这时 `kind` 还是
+  字段默认值 `ActorKind.Enemy`（枚举第 0 项）**。于是不管要建的是什么，
+  都会被当成敌人挂上刚体和行为脚本。
+
+  等 `Create()` 回头把 `kind` 改成 `Reward` 再调一次 `EnsurePhysics()`，那次只是把
+  `box.isTrigger` 设成 `true` 然后 `return` —— `EnsurePhysics` 只补不删，
+  残留的两个组件就留在金币身上了。
+
+  表现：金币有动态刚体（Play 后受重力往下掉）、有巡逻行为（会左右走）、
+  玩家碰到还会被 `TryHit` 击退。
+
+  修了两处：
+
+  - `Create()` 改成 `go.SetActive(false)` → `AddComponent` → 赋完字段 → `SetActive(true)`。
+    物体关着的时候 `OnEnable` 不会跑，打开时 `kind` 已经就位。
+  - `EnsurePhysics()` 在 `kind != Enemy` 时调用新增的 `StripEnemyParts()`，
+    把残留的 `TestEnemy2D` / `Rigidbody2D` 摘掉（编辑模式 `DestroyImmediate`，
+    运行时 `Destroy`）。**场景里已经存在的那些金币 / NPC 靠这一步自愈，不用删了重建**，
+    进一次 Play 或重编译即可。
+
+    注意这个清理只在 `OnEnable` 里触发 —— 在 Inspector 里把 `kind` 从敌人改成
+    奖励点之后，同样要进一次 Play 才生效（Unity 禁止在 `OnValidate` 里
+    `DestroyImmediate`）。
+
+### Added
+
+- **测试阶段多了三行占位标记：敌人 / NPC / 奖励点**（`Scripts/TestActor2D.cs`）。
+
+  位置是**「什么都没选」时的左上角面板**（`SortingOrderToolbar.DrawStageActionPanel`
+  的测试分支）。选中地形时那块面板保持原样 —— 那里已经有角色、碰撞、手感参数，
+  再塞三行就挤了。
+
+  每行一个类型下拉 + 一个「创建」。类型表写死在 `TestActor2D.TypeTable`：
+  敌人 = 巡逻/飞行/射击/静止，NPC = 对话/商贩/任务，奖励点 = 金币/血包/存档点。
+  选中的类型存 `EditorPrefs`，重启后还记得。
+
+  创建出来的是**纯占位方块**：自己生成一张 16×16 白色 sprite，按种类染色
+  （敌人红 / NPC 蓝 / 奖励点金）。位置取当前 Scene 视图中心，**Z 归零**；
+  不挂父物体（地形常有 0.06~0.3 的缩放，挂上去标记会缩成一点）；重名自动加序号。
+
+- **占位标记有了碰撞，敌人有了行为**（`Scripts/TestEnemy2D.cs`、`TestProjectile2D.cs`）。
+
+  - 敌人 / NPC：实心 `BoxCollider2D`，走过去会被挡住
+  - 奖励点：`isTrigger`，不挡人（拾取判定以后挂这儿）
+  - 敌人额外挂 `Rigidbody2D` + `TestEnemy2D`，类型名直接映射成行为：
+    **巡逻**（前方撞墙或没有地面就转身，不会走下悬崖）、**飞行**（无重力，
+    出生点左右 `flyRange` 往返 + 上下浮动）、**射击**（定时朝角色发子弹）、
+    **静止**。全部只在 Play 模式下跑。
+  - 撞到角色会把人弹开（`knockback`），带 `hitCooldown` 防止贴着敌人每帧被弹。
+    项目还没有血量系统，「受伤」暂时只有击退这一种表现。
+  - 子弹是触发器，4 秒或被撞就销毁；穿过其他敌人 / 占位标记，不会卡在自己身上。
+  - 巡逻的悬崖检测会跳过自身碰撞盒和所有触发器，否则脚下的射线会打在自己身上，
+    悬崖判断直接失效。
+
+- **视口右下角的「碰撞体」开关**（`Editor/ColliderDisplayOverlay.cs`）。把每块地形
+  实际生效的碰撞折线画出来：橙黄 = 体块轮廓，暗红 = 被禁用，品红 = 手动加的
+  `EdgeCollider2D`（开链两端各画一个十字）。`Handles.zTest = Always`，压在网格上
+  也看得见；`FindObjectsOfType` 结果缓存，层级变化才重找。状态存 `EditorPrefs`，默认关。
+
 ## [0.5.3] - 2026-11-10
 
 ### Fixed
@@ -356,6 +602,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Verified on Unity 2022.3.53f1 with URP 14 (2D Renderer).
 
 [Unreleased]: https://github.com/CHANGE_ME/terrain2d/commits/main
+[0.6.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.5.3...v0.6.0
 [0.5.1]: https://github.com/CHANGE_ME/terrain2d/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/CHANGE_ME/terrain2d/compare/v0.3.1...v0.4.0

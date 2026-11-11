@@ -72,12 +72,44 @@ namespace Terrain2D.EditorTools
             Flush();
         }
 
+        /// <summary>
+        /// 按名字删掉一条。不存在就什么也不做。
+        ///
+        /// 数据在 `EditorPrefs` 里，删了**没有撤销** —— 所以菜单里把它放在子菜单里，
+        /// 不和"选一个"混在一起：误点一下就把存好的档位删掉，代价太大。
+        /// </summary>
+        public static void Remove(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return;
+
+            var entries = Data.entries;
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                if (entries[i].name != name) continue;
+
+                entries.RemoveAt(i);
+                Flush();
+                return;
+            }
+        }
+
+        /// <summary>清空全部。**调用方自己负责确认**，这里不弹对话框。</summary>
+        public static void RemoveAll()
+        {
+            var entries = Data.entries;
+            if (entries.Count == 0) return;
+
+            entries.Clear();
+            Flush();
+        }
+
         static void Flush()
         {
             EditorPrefs.SetString(PrefKey, JsonUtility.ToJson(Data));
         }
 
-        /// <summary>Drops down the saved Z values, with "save the current one" at the end.</summary>
+        /// <summary>Drops down the saved Z values, then delete / save at the end.</summary>
         public static void ShowMenu(float current, Action<float> onPick)
         {
             var menu = new GenericMenu();
@@ -100,6 +132,28 @@ namespace Terrain2D.EditorTools
                         new GUIContent(preset.name + "   (" + preset.value.ToString("0.##") + ")"),
                         false, () => onPick(preset.value));
                 }
+
+                // 删除单独收进子菜单。存好的档位是设计时定的，误删比误选代价大得多。
+                for (int i = 0; i < entries.Count; i++)
+                {
+                    DepthPreset preset = entries[i];
+                    menu.AddItem(new GUIContent("删除预设/" + preset.name), false,
+                        () => Remove(preset.name));
+                }
+
+                int total = entries.Count;
+
+                menu.AddSeparator("删除预设/");
+                menu.AddItem(new GUIContent("删除预设/全部清空"), false, () =>
+                {
+                    if (!EditorUtility.DisplayDialog(
+                            "清空 Z 预设",
+                            "删掉全部 " + total + " 个命名 Z？这一步不能撤销。",
+                            "清空", "取消"))
+                        return;
+
+                    RemoveAll();
+                });
             }
 
             menu.AddSeparator(string.Empty);
