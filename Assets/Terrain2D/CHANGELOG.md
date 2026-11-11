@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-11
+
+### Changed (breaking)
+
+- **命名空间和全部类型加了 `LDK2D` 前缀，防止装进别的项目时和已有类型重名。**
+
+  以前命名空间叫 `Terrain2D`，类型叫 `HeightmapTerrain2D` / `MeshUtil` / `Triangulator` /
+  `ActorKind` 这类通用名，放进别人的工程很容易撞上 —— 尤其是 `Triangulator` 和三个枚举。
+  现在统一前缀：
+
+  | 旧 | 新 |
+  |---|---|
+  | `namespace Terrain2D` | `namespace LDK2D` |
+  | `namespace Terrain2D.EditorTools` | `namespace LDK2D.EditorTools` |
+  | `HeightmapTerrain2D` | `LDK2DHeightmapTerrain` |
+  | `PolygonMesh2D` | `LDK2DPolygonMesh` |
+  | `MeshUtil` | `LDK2DMeshUtil` |
+  | `Triangulator` | `LDK2DTriangulator` |
+  | `TestActor2D` | `LDK2DTestActor` |
+  | `TestEnemy2D` | `LDK2DTestEnemy` |
+  | `TestPlayer2D` | `LDK2DTestPlayer` |
+  | `TestCamera2D` | `LDK2DTestCamera` |
+  | `TestProjectile2D` | `LDK2DTestProjectile` |
+  | `ActorKind` | `LDK2DActorKind` |
+  | `EnemyBehaviour` | `LDK2DEnemyBehaviour` |
+  | `TestCameraMode` | `LDK2DTestCameraMode` |
+  | `UVMode` / `OutlineSource` | `LDK2DUVMode` / `LDK2DOutlineSource` |
+  | `TerrainStage` / `WorkStage` | `LDK2DTerrainStage` / `LDK2DWorkStage` |
+  | `Terrain2DToolsEditor` | `LDK2DToolsEditor` |
+  | `Terrain2DMenuItems` | `LDK2DMenuItems` |
+  | `SortingOrderToolbar` | `LDK2DSortingOrderToolbar` |
+  | `SceneToolbarLayout` | `LDK2DSceneToolbarLayout` |
+  | `SceneDepthVisibility` | `LDK2DSceneDepthVisibility` |
+  | `ColliderDisplayOverlay` | `LDK2DColliderDisplayOverlay` |
+  | `DepthPresets` / `DepthPreset` / `DepthPresetStore` | `LDK2DDepthPresets` / `LDK2DDepthPreset` / `LDK2DDepthPresetStore` |
+  | `ColorPalette` / `PaletteEntry` / `PaletteStore` | `LDK2DColorPalette` / `LDK2DPaletteEntry` / `LDK2DPaletteStore` |
+  | `NameDialog` / `InspectorL10n` / `TestCameraPrefs` / `PlayModeCameraSync` | 同名加 `LDK2D` |
+
+  文件名跟着改，`.cs` 和 `.cs.meta` 同步重命名 —— **GUID 不变**，所以场景里挂着组件的物体
+  （9 块地形、测试角色、测试摄像机、敌人、金币）一个引用都不会丢。序列化字段名没有动，
+  Inspector 上调过的值也都还在。
+
+- **菜单路径 `GameObject/地形 2D/…` 改成 `GameObject/LDK2D/…`**，
+  `AddComponentMenu` 的 `地形 2D/…` 改成 `LDK2D/…`。菜单项文字本身仍然是中文。
+
+- **程序集名改成 `LDK2D.Runtime` / `LDK2D.Editor`**，`rootNamespace` 同步改成
+  `LDK2D` / `LDK2D.EditorTools`，Editor 程序集对 Runtime 的引用路径一起更新。
+
+### 有意没改的
+
+- **`EditorPrefs` 的键仍然是 `Terrain2D.*`。** 键是字符串，不会造成编译冲突；改了会让已经存下的
+  Z 预设（`Terrain2D.DepthPresets` 里的「地形」「背景层」）、调色板条目和阶段状态全部读不到。
+  要改成 `LDK2D.*` 得配一次读旧键的迁移，单独做。
+
+- **目录仍是 `Assets/Terrain2D/`，`package.json` 的 `name` 仍是 `com.zhongxiaguchen.terrain2d`。**
+  改目录和包名属于打包发布层面的事，和类型冲突无关，需要时单独处理。
+
 ## [0.7.0] - 2026-11-11
 
 ### Added

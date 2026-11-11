@@ -4,40 +4,46 @@
 
 **所在项目**：OrisLevel（Unity 2022.3.53f1 · URP 14 · 2D Renderer）
 
+**命名**：命名空间是 `LDK2D` / `LDK2D.EditorTools`，所有类型和文件都带 `LDK2D` 前缀
+（`LDK2DHeightmapTerrain`、`LDK2DPolygonMesh` …），装进别的项目不会和已有类型撞名。
+菜单在 `GameObject ▸ LDK2D ▸ …`。
+**例外**：`EditorPrefs` 的键和目录名仍是旧的 `Terrain2D.*` / `Assets/Terrain2D/` ——
+键是字符串不产生编译冲突，改了会丢已存的 Z 预设和调色板。
+
 ```
 Assets/Terrain2D/
 ├── Scripts/
-│   ├── Triangulator.cs          耳切三角化（简单多边形）
-│   ├── MeshUtil.cs              Mesh 组装工具（法线/切线/材质）
-│   ├── PolygonMesh2D.cs         ★ 轮廓 → Mesh，轮廓来自 PolygonCollider2D
-│   ├── HeightmapTerrain2D.cs    ★ 高度数组 → Mesh + 碰撞体，程序化/可破坏 + Scene 视图雕刻
-│   ├── TestPlayer2D.cs          能跑能跳的测试角色，用来验证地形
-│   ├── TestActor2D.cs           占位标记：敌人 / NPC / 奖励点（碰撞按种类区分）
-│   ├── TestEnemy2D.cs           敌人行为：巡逻 / 飞行 / 射击 / 静止 + 击退角色
-│   ├── TestProjectile2D.cs      射击型敌人的子弹
-│   └── TestCamera2D.cs          测试摄像机：跟随 / 仅水平 / 仅垂直 / 固定
+│   ├── LDK2DTriangulator.cs           耳切三角化（简单多边形）
+│   ├── LDK2DMeshUtil.cs               Mesh 组装工具（法线/切线/材质）
+│   ├── LDK2DPolygonMesh.cs            ★ 轮廓 → Mesh，轮廓来自 PolygonCollider2D
+│   ├── LDK2DHeightmapTerrain.cs       ★ 高度数组 → Mesh + 碰撞体，程序化/可破坏 + Scene 视图雕刻
+│   ├── LDK2DTestPlayer.cs             能跑能跳的测试角色，用来验证地形
+│   ├── LDK2DTestActor.cs              占位标记：敌人 / NPC / 奖励点（碰撞按种类区分）
+│   ├── LDK2DTestEnemy.cs              敌人行为：巡逻 / 飞行 / 射击 / 静止 + 击退角色
+│   ├── LDK2DTestProjectile.cs         射击型敌人的子弹
+│   └── LDK2DTestCamera.cs             测试摄像机：跟随 / 仅水平 / 仅垂直 / 固定
 └── Editor/
-    ├── Terrain2DToolsEditor.cs  Inspector 按钮、Scene 视图手柄、菜单项
-    ├── TerrainStage.cs          搭建 / 测试 / 资产替换 三个阶段的状态与选择器
-    ├── TestCameraPrefs.cs       测试摄像机模式的选项与持久化
-    ├── ColliderDisplayOverlay.cs 右下角「碰撞体」开关：画出场景里所有碰撞体的轮廓
-    ├── SceneDepthVisibility.cs   资产替换面板的「场景显示层级」：按 Z 分层开关渲染器
-    ├── SortingOrderToolbar.cs   左下角固定栏 + 左上角面板（非地形选择时）
-    └── SceneToolbarLayout.cs    左下固定栏 / 左上阶段面板的定位与宽度
+    ├── LDK2DToolsEditor.cs            Inspector 按钮、Scene 视图手柄、菜单项
+    ├── LDK2DTerrainStage.cs           搭建 / 测试 / 资产替换 三个阶段的状态与选择器
+    ├── LDK2DTestCameraPrefs.cs        测试摄像机模式的选项与持久化
+    ├── LDK2DColliderDisplayOverlay.cs 右下角「碰撞体」开关：画出场景里所有碰撞体的轮廓
+    ├── LDK2DSceneDepthVisibility.cs   资产替换面板的「场景显示层级」：按 Z 分层开关渲染器
+    ├── LDK2DSortingOrderToolbar.cs    左下角固定栏 + 左上角面板（非地形选择时）
+    └── LDK2DSceneToolbarLayout.cs     左下固定栏 / 左上阶段面板的定位与宽度
 ```
 
 依赖：`com.unity.feature.2d`（已装，含 Sprite Shape 9.0.5 / Tilemap Extras 3.1.3）、
 `com.unity.modules.physics2d`。没有额外的第三方依赖。
 
-**快速上手**：菜单栏 `GameObject → 地形 2D → 创建高度场地形` 直接生成一块地形，
-再 `GameObject → 地形 2D → 创建测试角色` 加一个能跑能跳的方块（顺带把跟随镜头配好），
+**快速上手**：菜单栏 `GameObject → LDK2D → 创建高度场地形` 直接生成一块地形，
+再 `GameObject → LDK2D → 创建测试角色` 加一个能跑能跳的方块（顺带把跟随镜头配好），
 按 Play 就能试地形。
-另一个菜单项 `GameObject → 地形 2D → 为选中的碰撞体添加多边形网格` 给已有的
+另一个菜单项 `GameObject → LDK2D → 为选中的碰撞体添加多边形网格` 给已有的
 `PolygonCollider2D` 补上渲染。
 
 **Inspector 字段标题、悬停提示、按钮、菜单全部是中文的。**
 
-字段标题的中文写在 `Editor/InspectorL10n.cs` 配合各编辑器里；
+字段标题的中文写在 `Editor/LDK2DInspectorL10n.cs` 配合各编辑器里；
 悬停提示直接反射读取组件字段上的 `[Tooltip]`，所以文案只有一份，改一处即可。
 
 ---
@@ -104,10 +110,10 @@ Assets/Terrain2D/
 
 ---
 
-## 路线 B：PolygonMesh2D（任意多边形，四条边都能加点）
+## 路线 B：LDK2DPolygonMesh（任意多边形，四条边都能加点）
 
 `PolygonCollider2D` 就是那个"可以自定义边缘"的组件，只是它不负责渲染。
-`PolygonMesh2D` 补上渲染这一半：**读碰撞体的 path → 三角化 → 生成 Mesh**。
+`LDK2DPolygonMesh` 补上渲染这一半：**读碰撞体的 path → 三角化 → 生成 Mesh**。
 
 **需要左右边也能加点编辑、需要斜边、需要隧道/洞穴 —— 就用这条路线。**
 它是自由多边形，没有"哪条边不能编辑"的限制。
@@ -115,7 +121,7 @@ Assets/Terrain2D/
 工作流：
 
 1. 建一个空物体，加 `Polygon Collider 2D`。
-2. 加 `PolygonMesh2D`（`MeshFilter` / `MeshRenderer` 会自动补上）。
+2. 加 `LDK2DPolygonMesh`（`MeshFilter` / `MeshRenderer` 会自动补上）。
 3. 选中 `Polygon Collider 2D`，点 **Edit Collider** 进入编辑状态。
 4. 在 Scene 视图里操作：
 
@@ -132,7 +138,7 @@ Assets/Terrain2D/
 
 **和路线 C 的分工**
 
-| | HeightmapTerrain2D | PolygonMesh2D |
+| | LDK2DHeightmapTerrain | LDK2DPolygonMesh |
 |---|---|---|
 | 形状 | 地表 + 底部两条曲线（带子） | 任意闭合多边形 |
 | 左右边 | 只能是直线（可用青色手柄拖成斜线） | 任意曲线，可加点 |
@@ -145,7 +151,7 @@ Assets/Terrain2D/
 
 - 碰撞体的每一条 path 会变成一个独立的填充区域，彼此是"岛"不是"洞"。
 - 要挖洞，用 **keyhole** 画法：从外轮廓切一条很窄的缝进去，绕洞一圈再缝回来，
-  这样整体仍是一个简单多边形。见 `Triangulator` 注释。
+  这样整体仍是一个简单多边形。见 `LDK2DTriangulator` 注释。
 - 顶点顺序（顺/逆时针）不用管，内部会归一化。
 - 没指定材质时自动挂 URP 2D 着色器（`Sprite-Lit-Default` → `Sprite-Unlit-Default` → `Sprites/Default` 依次尝试）。
   渲染反面了就把「翻转绕序」打开。
@@ -166,14 +172,14 @@ Assets/Terrain2D/
 **API**
 
 ```csharp
-var mesh = GetComponent<PolygonMesh2D>();
+var mesh = GetComponent<LDK2DPolygonMesh>();
 mesh.Rebuild();                          // 手动重建
 var paths = mesh.ReadPaths();            // 读当前轮廓（局部坐标）
 ```
 
 ---
 
-## 路线 C：HeightmapTerrain2D（不规则地形 / 程序化 / 可破坏）
+## 路线 C：LDK2DHeightmapTerrain（不规则地形 / 程序化 / 可破坏）
 
 地形是**一条闭合折线围成的实体**，四条边都能加点：
 
@@ -188,7 +194,7 @@ var paths = mesh.ReadPaths();            // 读当前轮廓（局部坐标）
 网格和碰撞体都从这条闭合折线派生。因为地表是"X 的函数"，挖洞只是改数组里的数字。
 
 **不能做的**：地形中间挖洞（隧道、洞穴）—— 单条闭合折线表达不了"环"。
-那种需求用 `PolygonMesh2D`。
+那种需求用 `LDK2DPolygonMesh`。
 
 **Inspector 参数（中文，按分组排列）**
 
@@ -294,7 +300,7 @@ Inspector 底部有 **「进入编辑模式」** 按钮，点一下进入（再�
 身上没碰撞体，开关就显示为关，点一下全补上。
 
 **资产替换阶段（什么都没选时）多了「场景显示层级」**：给一个 Z，把这个 Z 上的渲染器
-统一显示 / 隐藏。Z 有两种给法——输入框直接输（默认 `0`），或者点 `▾` 从 `DepthPresets`
+统一显示 / 隐藏。Z 有两种给法——输入框直接输（默认 `0`），或者点 `▾` 从 `LDK2DDepthPresets`
 里选存过的命名 Z（「地形 (0)」这种），和「层级 / Z」那一行共用同一张预设表。
 
 **只关渲染器，碰撞体一律不动** —— 关掉一层是为了看清下面那层在画什么，如果连碰撞一起
@@ -304,8 +310,8 @@ Inspector 底部有 **「进入编辑模式」** 按钮，点一下进入（再�
 无关；而且人检查整体效果时通常什么都不选。右边的「显示碰撞体」和视口右下角那颗按钮是
 **同一个状态**。
 
-阶段状态和选择器的画法在 `Editor/TerrainStage.cs`，面板的定位在
-`Editor/SceneToolbarLayout.cs`（`Panel()` 会避开 Unity 自带的竖排工具条：
+阶段状态和选择器的画法在 `Editor/LDK2DTerrainStage.cs`，面板的定位在
+`Editor/LDK2DSceneToolbarLayout.cs`（`Panel()` 会避开 Unity 自带的竖排工具条：
 那块的高度随 2D/3D 模式变，宽度不变，所以往右让而不是往下让）。
 
 **搭建阶段**
@@ -347,7 +353,7 @@ Inspector 底部有 **「进入编辑模式」** 按钮，点一下进入（再�
   复制粘贴角色之后经常忘掉多出来的那几个，然后纳闷"镜头怎么跟的是另一个"
 - 没有测试角色时按钮变成「创建测试角色」，造完自动摆到地形左端 ——
   直接放在视口中心的话多半悬在半空。**摄像机也在这一刻一起配好**
-- 三个滑块直接写 `TestPlayer2D` 的字段，**Play 模式下改立刻生效**，
+- 三个滑块直接写 `LDK2DTestPlayer` 的字段，**Play 模式下改立刻生效**，
   可以边跑边调"这个坑到底要多高才跳得过去"
 - 碰撞偏移用来把碰撞边缘从视觉边缘推开：跳起来明明没碰到、或者明明站住了却掉下去，
   先调这个
@@ -356,7 +362,7 @@ Inspector 底部有 **「进入编辑模式」** 按钮，点一下进入（再�
 **测试摄像机**
 
 没有镜头的话，按 Play 跑两步人就出画了，只能一边跑一边手动拖 Scene 视图。
-`TestCamera2D` 挂在主摄像机上，四种模式：
+`LDK2DTestCamera` 挂在主摄像机上，四种模式：
 
 | 模式 | 跟什么 | 用来验证 |
 |---|---|---|
@@ -369,7 +375,7 @@ Inspector 底部有 **「进入编辑模式」** 按钮，点一下进入（再�
   「仅水平」保留你当前摆好的构图高度，而不是把镜头拽到 `y = 0`
 - 模式存在 `EditorPrefs` 的 `Terrain2D.TestCameraMode`，默认跟随。
   还没建摄像机时也能先选，创建时直接生效
-- 优先复用已有的 `TestCamera2D`；没有就挂在 `Camera.main` 上；连主摄像机都没有才新建。
+- 优先复用已有的 `LDK2DTestCamera`；没有就挂在 `Camera.main` 上；连主摄像机都没有才新建。
   **不另建一台**是因为两台启用的摄像机会双份渲染，而主摄像机本来就已经配好了
   正交尺寸和背景色 —— 加一个跟随组件是纯增量，删掉组件场景一点没动
 - 只在 Play 下跟随。编辑时镜头自己飘走会让人没法摆关卡
@@ -427,7 +433,7 @@ Inspector 底部有 **「进入编辑模式」** 按钮，点一下进入（再�
 3. 底边想要更细的点：**Shift + 点底边** —— 走独立的底边折线，地表完全不受影响
 4. 左右边想要更自由的形状：Shift + 点左右边加点，拖橙色圆点做外凸或内凹的岩壁
 
-> 需要**地形中间挖洞**（隧道、洞穴）仍然要用 `PolygonMesh2D` ——
+> 需要**地形中间挖洞**（隧道、洞穴）仍然要用 `LDK2DPolygonMesh` ——
 > 单条闭合折线表达不了"环"这种拓扑。
 
 **为什么拖动不用 `Handles.Slider`**
@@ -482,7 +488,7 @@ Inspector 底部有 **「进入编辑模式」** 按钮，点一下进入（再�
 **API**
 
 ```csharp
-var terrain = GetComponent<HeightmapTerrain2D>();
+var terrain = GetComponent<LDK2DHeightmapTerrain>();
 
 terrain.Generate();                       // 按当前参数用噪声生成（会清掉四条边的控制点）
 terrain.Flatten();                        // 拍平
@@ -540,9 +546,9 @@ terrain.Rebuild();                        // 改完重建
 两条可以同时用：地形本体负责内部填充，子物体负责轮廓装饰。**都不是"先盖住再删壳"** ——
 壳（Mesh + 碰撞体）必须留着，碰撞体和 `SampleHeight` 都挂在它身上。
 
-### 那个 `Terrain2D (Universal R P...)` 材质是什么
+### 那个 `LDK2D (Universal R P...)` 材质是什么
 
-`Element 0` 里那个不是项目资产，是 `MeshUtil.EnsureMaterial()` 在运行时**自动生成的内嵌材质**，
+`Element 0` 里那个不是项目资产，是 `LDK2DMeshUtil.EnsureMaterial()` 在运行时**自动生成的内嵌材质**，
 只存在于内存/场景里。它没有贴图槽可以点，也没法在 Project 里找到。
 
 要交给美术，必须换成一个真正的材质资产：
@@ -641,7 +647,7 @@ spacing = 期望的世界宽度 / (采样点数量 - 1)
 
 ## 测试角色
 
-菜单 `GameObject → 地形 2D → 创建测试角色`。出来一个方块，按 Play 就能跑能跳，
+菜单 `GameObject → LDK2D → 创建测试角色`。出来一个方块，按 Play 就能跑能跳，
 用来在改完地形后**立刻**回答"这个坑跳得过去吗"。
 
 **它不依赖任何美术资源。** 没指定 sprite 时会自己生成一张 16×16 的白色方块
@@ -687,7 +693,7 @@ spacing = 期望的世界宽度 / (采样点数量 - 1)
 **碰撞**：敌人和 NPC 是实心的，走过去会被挡住；奖励点是 `isTrigger`，人不被挡 ——
 将来拾取判定就挂在这上面。
 
-**敌人的行为**（`TestEnemy2D`，**只在 Play 模式动**）：
+**敌人的行为**（`LDK2DTestEnemy`，**只在 Play 模式动**）：
 
 | 类型 | 行为 |
 |---|---|
@@ -699,7 +705,7 @@ spacing = 期望的世界宽度 / (采样点数量 - 1)
 撞到角色会把人弹开（`knockback`，默认 9）。项目还没有血量系统，所以「受伤」暂时
 只表现成击退 —— 够用来验证"这个敌人放的位置对不对"。
 
-子弹（`TestProjectile2D`）是触发器，飞 4 秒或者撞到东西就消失；撞到角色同样击退。
+子弹（`LDK2DTestProjectile`）是触发器，飞 4 秒或者撞到东西就消失；撞到角色同样击退。
 子弹会穿过其他敌人和占位标记，不会卡在自己身上。
 
 **NPC 和奖励点没有任何逻辑** —— 对话、商贩、拾取都还没做，它们只是标记。
@@ -716,7 +722,7 @@ spacing = 期望的世界宽度 / (采样点数量 - 1)
 - 选中的类型存 `EditorPrefs`，重启 Editor 还记得上次选的
 - 创建后**不选中**新物体，只 `PingObject` 闪一下 —— 选中会让地形面板立刻消失
 
-想加自己的类型，改 `TestActor2D.TypeTable` 里对应那一行就行（三行分别对应
+想加自己的类型，改 `LDK2DTestActor.TypeTable` 里对应那一行就行（三行分别对应
 敌人 / NPC / 奖励点）。
 
 > **依赖旧版 Input**（`Input.GetAxisRaw` / `GetButtonDown`），因为这个项目
@@ -741,9 +747,9 @@ spacing = 期望的世界宽度 / (采样点数量 - 1)
 | 需求 | 方案 |
 |---|---|
 | 平滑起伏、手绘轮廓、要好看 | Sprite Shape（路线 A） |
-| **地形中间要挖洞（隧道 / 洞穴）** | **PolygonMesh2D（路线 B）** |
-| 随机生成、固定种子、可破坏 | HeightmapTerrain2D（路线 C） |
-| 大块地形、平台、悬崖，四条边都要能加点 | HeightmapTerrain2D（路线 C） |
+| **地形中间要挖洞（隧道 / 洞穴）** | **LDK2DPolygonMesh（路线 B）** |
+| 随机生成、固定种子、可破坏 | LDK2DHeightmapTerrain（路线 C） |
+| 大块地形、平台、悬崖，四条边都要能加点 | LDK2DHeightmapTerrain（路线 C） |
 
 两条路线的边界很清楚：**需要"环"这种拓扑（洞）→ B；其余都用 C。**
 C 的四条边都能加点、能拖成任意形状，比 B 多出噪声生成和可破坏两个能力。
@@ -760,14 +766,14 @@ C 的四条边都能加点、能拖成任意形状，比 B 多出噪声生成和
 | 左上角 | 阶段工具 / 层级颜色 / 创建按钮 | 永远，内容随选择变 |
 
 如果左下角那条都没有，多半是 `SceneView.duringSceneGui` 的注册没跑起来 ——
-那个注册挂在 `SortingOrderToolbar` 的 `[InitializeOnLoad]` 上，
+那个注册挂在 `LDK2DSortingOrderToolbar` 的 `[InitializeOnLoad]` 上，
 保存任意脚本触发一次重编译即可恢复。
 
 如果只有左下角、左上角空了：说明当前选中的物体**没有渲染器**。
 那种选择下会故意保持安静，不会弹「创建地形」的提示。
 
 如果左上角面板位置别扭：它固定在 `x ≈ 2.6 行高`、`y ≈ 2.4 行高`，
-也就是 Unity 自带竖排工具条的右边。想挪位置改 `SceneToolbarLayout.Panel()`。
+也就是 Unity 自带竖排工具条的右边。想挪位置改 `LDK2DSceneToolbarLayout.Panel()`。
 
 > 早期版本里地形工具栏贴在**视口底部**、只在编辑模式下出现，
 > 现在拆成两个角：选择器在左下角（永远在），工具在左上角。
@@ -777,7 +783,7 @@ C 的四条边都能加点、能拖成任意形状，比 B 多出噪声生成和
 
 | 症状 | 处理 |
 |---|---|
-| 场景里根本没有地形物体 | 左上角面板的 [创建高度场地形]，或菜单 `GameObject ▸ 地形 2D ▸ 创建高度场地形` |
+| 场景里根本没有地形物体 | 左上角面板的 [创建高度场地形]，或菜单 `GameObject ▸ LDK2D ▸ 创建高度场地形` |
 | 有物体但看不到控制点 | 选中它，Inspector 里点「进入编辑模式」 |
 | 物体上显示 `Missing (Mono Script)` | 脚本 GUID 对不上，见下 |
 
@@ -787,9 +793,9 @@ C 的四条边都能加点、能拖成任意形状，比 B 多出噪声生成和
 
 | 文件 | guid |
 |---|---|
-| `Scripts/HeightmapTerrain2D.cs.meta` | `611f7509e735cf245ac346d37347e200` |
-| `Scripts/PolygonMesh2D.cs.meta` | `14e601de5bd66804cafb4f793c449231` |
-| `Editor/Terrain2DToolsEditor.cs.meta` | `1c32c5ef3e55b9e4cadafbd865bda989` |
+| `Scripts/LDK2DHeightmapTerrain.cs.meta` | `611f7509e735cf245ac346d37347e200` |
+| `Scripts/LDK2DPolygonMesh.cs.meta` | `14e601de5bd66804cafb4f793c449231` |
+| `Editor/LDK2DToolsEditor.cs.meta` | `1c32c5ef3e55b9e4cadafbd865bda989` |
 
 `.meta` 和 `.cs` 必须成对存在。只拷 `.cs` 不拷 `.meta`，Unity 会生成新 GUID，
 原来场景里的引用就全断了。

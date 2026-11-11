@@ -3,7 +3,7 @@ using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 
-namespace Terrain2D.EditorTools
+namespace LDK2D.EditorTools
 {
     /// <summary>
     /// 在 Inspector 里用中文标签绘制字段。
@@ -11,7 +11,7 @@ namespace Terrain2D.EditorTools
     /// 字段名保持英文（编码规范），中文标题写在这里；
     /// 悬停提示则直接从组件字段上的 [Tooltip] 反射读取，所以不用维护两份文案。
     /// </summary>
-    internal static class InspectorL10n
+    internal static class LDK2DInspectorL10n
     {
         static readonly Dictionary<string, FieldInfo> FieldCache = new Dictionary<string, FieldInfo>();
 

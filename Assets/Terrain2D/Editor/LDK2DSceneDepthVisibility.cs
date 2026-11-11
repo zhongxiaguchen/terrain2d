@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace Terrain2D.EditorTools
+namespace LDK2D.EditorTools
 {
     /// <summary>
     /// 资产替换阶段（**什么都没选**时）面板里的「场景显示层级」：
@@ -14,19 +14,19 @@ namespace Terrain2D.EditorTools
     ///
     /// **Z 由人给，不自动扫描。** 两种给法：
     ///   1. 直接输入，默认 0
-    ///   2. 从 <see cref="DepthPresets"/> 里选已经保存的命名 Z（「地形 (0)」这种）
+    ///   2. 从 <see cref="LDK2DDepthPresets"/> 里选已经保存的命名 Z（「地形 (0)」这种）
     ///
     /// 为什么不自动列出所有 Z：场景里拖出来的 Z 常常是 0.5001 / 0.25 / 0.0499 这种碎值，
     /// 自动分组会冒出一长串没人认识的层。而层级本来就是设计时定好的档位
-    /// （背景 / 地面 / 前景），`DepthPresets` 里已经存着了，直接复用那一份。
+    /// （背景 / 地面 / 前景），`LDK2DDepthPresets` 里已经存着了，直接复用那一份。
     /// 面板底部仍然把场景里实际存在的 Z 列出来当参考，省得靠猜。
     ///
-    /// 为什么挂到 <see cref="SceneToolbarLayout.AssetPanelExtra"/> 而不是被
-    /// `SortingOrderToolbar` 直接调用：那个文件比这个文件老，旧文件引用新类型
+    /// 为什么挂到 <see cref="LDK2DSceneToolbarLayout.AssetPanelExtra"/> 而不是被
+    /// `LDK2DSortingOrderToolbar` 直接调用：那个文件比这个文件老，旧文件引用新类型
     /// 会在 Unity 增量编译「先编译、后导入」的那一轮报 `does not contain a definition`。
     /// </summary>
     [InitializeOnLoad]
-    internal static class SceneDepthVisibility
+    internal static class LDK2DSceneDepthVisibility
     {
         const string ZPrefKey = "Terrain2D.TargetZ";
 
@@ -44,11 +44,11 @@ namespace Terrain2D.EditorTools
 
         static GUIStyle _noteStyle;
 
-        static SceneDepthVisibility()
+        static LDK2DSceneDepthVisibility()
         {
             _targetZ = EditorPrefs.GetFloat(ZPrefKey, 0f);
 
-            SceneToolbarLayout.AssetPanelExtra = DrawPanel;
+            LDK2DSceneToolbarLayout.AssetPanelExtra = DrawPanel;
 
             EditorApplication.hierarchyChanged -= Invalidate;
             EditorApplication.hierarchyChanged += Invalidate;
@@ -91,11 +91,11 @@ namespace Terrain2D.EditorTools
             // ---- 碰撞体显示 ----
             // 和视口右下角那颗按钮是**同一个状态**，不存在两处打架。
             bool showColliders = GUILayout.Toggle(
-                ColliderDisplayOverlay.Show, "显示碰撞体",
+                LDK2DColliderDisplayOverlay.Show, "显示碰撞体",
                 EditorStyles.miniButton, GUILayout.Width(96f));
 
-            if (showColliders != ColliderDisplayOverlay.Show)
-                ColliderDisplayOverlay.Show = showColliders;
+            if (showColliders != LDK2DColliderDisplayOverlay.Show)
+                LDK2DColliderDisplayOverlay.Show = showColliders;
 
             DrawKnownZ(all);
 
@@ -118,7 +118,7 @@ namespace Terrain2D.EditorTools
                 // 复用「层级 / Z」那一行用的同一张预设表。玩家存过的
                 // "背景 / 地面 / 前景" 本来就是给这个用的，不该再存一份。
                 // 菜单里也带「保存当前 Z…」，可以当场把正在看的这个值记下来。
-                DepthPresets.ShowMenu(_targetZ, SetTargetZ);
+                LDK2DDepthPresets.ShowMenu(_targetZ, SetTargetZ);
             }
 
             GUILayout.FlexibleSpace();

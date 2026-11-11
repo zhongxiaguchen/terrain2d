@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Terrain2D
+namespace LDK2D
 {
     /// <summary>
     /// 高度场地形：两条曲线（地表 + 底部）各是一个 float[] 数组，它们是唯一数据源，
@@ -14,13 +14,13 @@ namespace Terrain2D
     /// 因为轮廓是"X 的函数"而不是任意多边形，三角化退化成三角带，
     /// 挖坑也只是改数组里的数字 —— 适合程序化生成、固定种子、可破坏的场景。
     ///
-    /// 需要真正的自由多边形（带洞、带隧道）请用 PolygonMesh2D。
+    /// 需要真正的自由多边形（带洞、带隧道）请用 LDK2DPolygonMesh。
     /// </summary>
     [ExecuteAlways]
     [RequireComponent(typeof(MeshFilter))]
     [RequireComponent(typeof(MeshRenderer))]
-    [AddComponentMenu("地形 2D/高度场地形")]
-    public class HeightmapTerrain2D : MonoBehaviour
+    [AddComponentMenu("LDK2D/高度场地形")]
+    public class LDK2DHeightmapTerrain : MonoBehaviour
     {
         /// <summary>地表与底部之间必须保留的最小厚度，防止网格翻面。</summary>
         public const float MinThickness = 0.01f;
@@ -97,7 +97,7 @@ namespace Terrain2D
         /// <summary>
         /// UV 的生成方式。
         /// </summary>
-        public enum UVMode
+        public enum LDK2DUVMode
         {
             [InspectorName("平面映射")]
             Planar,
@@ -108,7 +108,7 @@ namespace Terrain2D
 
         [Tooltip("平面映射：按世界 X/Y 铺，最简单但斜坡上贴图会被拉长。\n" +
                  "沿曲面平铺：按地表弧长铺，贴图跟着起伏走，密度处处一致。")]
-        public UVMode uvMode = UVMode.Planar;
+        public LDK2DUVMode uvMode = LDK2DUVMode.Planar;
 
         [Tooltip("在 Scene 视图里画出贴图接缝的位置（每 1/uvScale 个世界单位一条）。" +
                  "没有贴图的时候，看这些刻度是否等距，就能判断弧长映射对不对。")]
@@ -1137,7 +1137,7 @@ namespace Terrain2D
         /// <summary>按当前 uvMode 算一个顶点的 UV。</summary>
         Vector2 UvFor(float x, float y)
         {
-            return uvMode == UVMode.SurfaceTiling
+            return uvMode == LDK2DUVMode.SurfaceTiling
                 ? SurfaceUV(new Vector2(x, y))
                 : new Vector2(x * uvScale, y * uvScale);
         }
@@ -1281,10 +1281,10 @@ namespace Terrain2D
             // 关掉「应用颜色」时要主动清掉覆盖值，不能只是不写 ——
             // MaterialPropertyBlock 一旦写进去就一直盖着材质，不清理的话
             // 用户看到的是"关了开关颜色还是那个颜色"。
-            if (applyColor) MeshUtil.ApplyColor(Renderer, color);
-            else MeshUtil.ClearColor(Renderer);
+            if (applyColor) LDK2DMeshUtil.ApplyColor(Renderer, color);
+            else LDK2DMeshUtil.ClearColor(Renderer);
 
-            MeshUtil.ApplySorting(Renderer, sortingLayerName, sortingOrder);
+            LDK2DMeshUtil.ApplySorting(Renderer, sortingLayerName, sortingOrder);
         }
 
         /// <summary>
@@ -1376,9 +1376,9 @@ namespace Terrain2D
             }
 
             OutlineValid = true;
-            _mesh = MeshUtil.Build("HeightmapTerrain2D", _mesh, verts, uvs, tris, flipWinding);
+            _mesh = LDK2DMeshUtil.Build("LDK2DHeightmapTerrain", _mesh, verts, uvs, tris, flipWinding);
             Filter.sharedMesh = _mesh;
-            MeshUtil.EnsureMaterial(Renderer);
+            LDK2DMeshUtil.EnsureMaterial(Renderer);
         }
 
         void BuildOutlineMesh()
@@ -1386,7 +1386,7 @@ namespace Terrain2D
             var outline = new List<Vector2>();
             BuildOutline(outline);
 
-            var tris = Triangulator.Triangulate(outline);
+            var tris = LDK2DTriangulator.Triangulate(outline);
             OutlineValid = tris.Count > 0;
 
             if (!OutlineValid)
@@ -1415,9 +1415,9 @@ namespace Terrain2D
                 uvs.Add(UvFor(outline[i].x, outline[i].y));
             }
 
-            _mesh = MeshUtil.Build("HeightmapTerrain2D", _mesh, verts, uvs, tris, flipWinding);
+            _mesh = LDK2DMeshUtil.Build("LDK2DHeightmapTerrain", _mesh, verts, uvs, tris, flipWinding);
             Filter.sharedMesh = _mesh;
-            MeshUtil.EnsureMaterial(Renderer);
+            LDK2DMeshUtil.EnsureMaterial(Renderer);
         }
 
         /// <summary>

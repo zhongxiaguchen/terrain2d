@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Terrain2D
+namespace LDK2D
 {
     /// <summary>
     /// 把 PolygonCollider2D 的轮廓渲染成网格。
@@ -12,15 +12,15 @@ namespace Terrain2D
     ///
     /// 碰撞体里的每条 path 会变成一个独立的填充区域（彼此是"岛"，不是"洞"）。
     /// 要挖洞请用 keyhole 画法：从外轮廓切一条窄缝进去，绕洞一圈再缝回来，
-    /// 这样整体仍是一个简单多边形。详见 Triangulator 的注释。
+    /// 这样整体仍是一个简单多边形。详见 LDK2DTriangulator 的注释。
     /// </summary>
     [ExecuteAlways]
     [RequireComponent(typeof(MeshFilter))]
     [RequireComponent(typeof(MeshRenderer))]
-    [AddComponentMenu("地形 2D/多边形网格地形")]
-    public class PolygonMesh2D : MonoBehaviour
+    [AddComponentMenu("LDK2D/多边形网格地形")]
+    public class LDK2DPolygonMesh : MonoBehaviour
     {
-        public enum OutlineSource
+        public enum LDK2DOutlineSource
         {
             [InspectorName("多边形碰撞体 2D")]
             PolygonCollider2D,
@@ -31,7 +31,7 @@ namespace Terrain2D
 
         [Header("轮廓来源")]
         [Tooltip("从 PolygonCollider2D 读轮廓（推荐），或使用下面的本地顶点列表。")]
-        public OutlineSource source = OutlineSource.PolygonCollider2D;
+        public LDK2DOutlineSource source = LDK2DOutlineSource.PolygonCollider2D;
 
         [Tooltip("从这里读轮廓。留空则自动找自己身上的 PolygonCollider2D。")]
         public PolygonCollider2D outline;
@@ -131,7 +131,7 @@ namespace Terrain2D
                 Vector2[] path = paths[p];
                 if (path == null || path.Length < 3) continue;
 
-                List<int> pathTris = Triangulator.Triangulate(path);
+                List<int> pathTris = LDK2DTriangulator.Triangulate(path);
                 if (pathTris.Count == 0) continue;
 
                 for (int i = 0; i < path.Length; i++)
@@ -155,17 +155,17 @@ namespace Terrain2D
                 return;
             }
 
-            _mesh = MeshUtil.Build("PolygonMesh2D", _mesh, verts, uvs, tris, flipWinding);
+            _mesh = LDK2DMeshUtil.Build("LDK2DPolygonMesh", _mesh, verts, uvs, tris, flipWinding);
             Filter.sharedMesh = _mesh;
-            MeshUtil.EnsureMaterial(Renderer);
+            LDK2DMeshUtil.EnsureMaterial(Renderer);
             ApplyVisuals();
         }
 
         /// <summary>应用颜色和排序设置。</summary>
         public void ApplyVisuals()
         {
-            if (applyColor) MeshUtil.ApplyColor(Renderer, color);
-            MeshUtil.ApplySorting(Renderer, sortingLayerName, sortingOrder);
+            if (applyColor) LDK2DMeshUtil.ApplyColor(Renderer, color);
+            LDK2DMeshUtil.ApplySorting(Renderer, sortingLayerName, sortingOrder);
         }
 
         /// <summary>返回当前轮廓的所有 path，坐标为本地空间。</summary>
@@ -173,7 +173,7 @@ namespace Terrain2D
         {
             var result = new List<Vector2[]>();
 
-            if (source == OutlineSource.PolygonCollider2D)
+            if (source == LDK2DOutlineSource.PolygonCollider2D)
             {
                 PolygonCollider2D col = outline != null ? outline : GetComponent<PolygonCollider2D>();
                 if (col == null) return result;

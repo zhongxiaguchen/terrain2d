@@ -2,13 +2,13 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Terrain2D
+namespace LDK2D
 {
     /// <summary>
-    /// 共享的网格组装工具。让 PolygonMesh2D 和 HeightmapTerrain2D 产出的网格保持一致
+    /// 共享的网格组装工具。让 LDK2DPolygonMesh 和 LDK2DHeightmapTerrain 产出的网格保持一致
     /// （法线、切线、索引格式、包围盒）。
     /// </summary>
-    internal static class MeshUtil
+    internal static class LDK2DMeshUtil
     {
         /// <summary>
         /// 用给定缓冲区填充并返回 <paramref name="mesh"/>。
@@ -87,7 +87,7 @@ namespace Terrain2D
 
                 renderer.sharedMaterial = new Material(shader)
                 {
-                    name = "Terrain2D (" + shader.name + ")"
+                    name = "LDK2D (" + shader.name + ")"
                 };
 
                 // 必须 mark dirty，否则编辑器里现造的这份材质**不会被保存**。
@@ -105,7 +105,7 @@ namespace Terrain2D
                 return;
             }
 
-            Debug.LogWarning("Terrain2D：找不到默认的精灵着色器，请手动指定材质。");
+            Debug.LogWarning("LDK2D：找不到默认的精灵着色器，请手动指定材质。");
         }
 
         // 不同着色器给颜色属性起的名字不一样，挨个试。

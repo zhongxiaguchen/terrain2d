@@ -1,8 +1,12 @@
 {
-    "name": "Terrain2D.Runtime",
-    "rootNamespace": "Terrain2D",
-    "references": [],
-    "includePlatforms": [],
+    "name": "LDK2D.Editor",
+    "rootNamespace": "LDK2D.EditorTools",
+    "references": [
+        "LDK2D.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,

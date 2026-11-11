@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Terrain2D
+namespace LDK2D
 {
     /// <summary>
     /// 「射击」型敌人打出去的子弹。只存在于 Play 模式，飞几秒或者撞到东西就消失。
@@ -8,8 +8,8 @@ namespace Terrain2D
     /// 撞到角色会把他弹开（和敌人本体一样，项目还没有血量系统）；
     /// 撞到地形直接消失；碰到别的敌人 / 占位标记也消失 —— 否则子弹会卡在自己身上。
     /// </summary>
-    [AddComponentMenu("地形 2D/测试子弹")]
-    public class TestProjectile2D : MonoBehaviour
+    [AddComponentMenu("LDK2D/测试子弹")]
+    public class LDK2DTestProjectile : MonoBehaviour
     {
         [Tooltip("子弹存在几秒。防止没撞到东西的子弹永远留在场景里。")]
         public float life = 4f;
@@ -19,14 +19,14 @@ namespace Terrain2D
 
         float _dieAt;
 
-        public static TestProjectile2D Spawn(Vector2 position, Vector2 velocity, Color color)
+        public static LDK2DTestProjectile Spawn(Vector2 position, Vector2 velocity, Color color)
         {
             var go = new GameObject("子弹");
             go.transform.position = new Vector3(position.x, position.y, 0f);
             go.transform.localScale = new Vector3(0.18f, 0.18f, 1f);
 
             var sprite = go.AddComponent<SpriteRenderer>();
-            sprite.sprite = TestActor2D.PlaceholderSprite;
+            sprite.sprite = LDK2DTestActor.PlaceholderSprite;
             sprite.color = color;
 
             var box = go.AddComponent<BoxCollider2D>();
@@ -37,7 +37,7 @@ namespace Terrain2D
             body.freezeRotation = true;
             body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
 
-            var bullet = go.AddComponent<TestProjectile2D>();
+            var bullet = go.AddComponent<LDK2DTestProjectile>();
             body.velocity = velocity;
 
             return bullet;
@@ -59,10 +59,10 @@ namespace Terrain2D
             if (!Application.isPlaying || other == null) return;
 
             // 别的敌人 / 占位标记：不管，穿过去。子弹从枪口出来时可能还压在自己身上。
-            if (other.GetComponent<TestEnemy2D>() != null) return;
-            if (other.GetComponent<TestActor2D>() != null) return;
+            if (other.GetComponent<LDK2DTestEnemy>() != null) return;
+            if (other.GetComponent<LDK2DTestActor>() != null) return;
 
-            var player = other.GetComponent<TestPlayer2D>();
+            var player = other.GetComponent<LDK2DTestPlayer>();
 
             if (player != null)
             {

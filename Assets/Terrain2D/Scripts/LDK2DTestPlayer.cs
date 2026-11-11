@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Terrain2D
+namespace LDK2D
 {
     /// <summary>
     /// 一个能跑能跳的测试角色，用来在改完地形之后立刻验证「跳得过去吗」。
@@ -15,11 +15,11 @@ namespace Terrain2D
     /// 的 Active Input Handling 是 Input Manager。换新输入系统的话改 Update 里那几行。
     /// </summary>
     [ExecuteAlways]
-    [AddComponentMenu("地形 2D/测试角色")]
+    [AddComponentMenu("LDK2D/测试角色")]
     [RequireComponent(typeof(Rigidbody2D))]
     [RequireComponent(typeof(Collider2D))]
     [RequireComponent(typeof(SpriteRenderer))]
-    public class TestPlayer2D : MonoBehaviour
+    public class LDK2DTestPlayer : MonoBehaviour
     {
         [Header("移动")]
         [Tooltip("水平最大速度（世界单位/秒）。")]
@@ -122,7 +122,7 @@ namespace Terrain2D
             {
                 if (_frictionless == null)
                 {
-                    _frictionless = new PhysicsMaterial2D("Terrain2D 测试角色（无摩擦）")
+                    _frictionless = new PhysicsMaterial2D("LDK2D 测试角色（无摩擦）")
                     {
                         friction = 0f,
                         bounciness = 0f,
@@ -217,7 +217,7 @@ namespace Terrain2D
 
             var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
             {
-                name = "Terrain2D 测试角色",
+                name = "LDK2D 测试角色",
                 filterMode = FilterMode.Point,
                 hideFlags = HideFlags.HideAndDontSave
             };
@@ -235,7 +235,7 @@ namespace Terrain2D
                 new Vector2(0.5f, 0.5f),
                 size);
 
-            sprite.name = "Terrain2D 测试角色";
+            sprite.name = "LDK2D 测试角色";
             sprite.hideFlags = HideFlags.HideAndDontSave;
 
             return sprite;

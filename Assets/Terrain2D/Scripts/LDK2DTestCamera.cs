@@ -1,9 +1,9 @@
 using UnityEngine;
 
-namespace Terrain2D
+namespace LDK2D
 {
     /// <summary>测试摄像机的跟随方式。顺序和编辑器里的下拉一致。</summary>
-    public enum TestCameraMode
+    public enum LDK2DTestCameraMode
     {
         /// <summary>双轴跟随 —— 默认。角色往哪走，镜头往哪跟。</summary>
         Follow = 0,
@@ -19,7 +19,7 @@ namespace Terrain2D
     }
 
     /// <summary>
-    /// 配合 <see cref="TestPlayer2D"/> 的测试摄像机。
+    /// 配合 <see cref="LDK2DTestPlayer"/> 的测试摄像机。
     ///
     /// **它不是成品相机控制器。** 没有边界限制、没有前瞻、没有震屏，
     /// 只有"跟着谁、跟哪几个轴、多快跟上"三件事 —— 够验证地形，不够做游戏。
@@ -32,14 +32,14 @@ namespace Terrain2D
     /// 锁定的那一轴取的是**切到该模式时的相机位置**，不是世界 0 ——
     /// 所以「仅水平」会保留你当前摆好的构图高度，而不是把镜头拽到 y = 0。
     /// </summary>
-    [AddComponentMenu("地形 2D/测试摄像机")]
+    [AddComponentMenu("LDK2D/测试摄像机")]
     [DisallowMultipleComponent]
-    public class TestCamera2D : MonoBehaviour
+    public class LDK2DTestCamera : MonoBehaviour
     {
         [Tooltip("跟随方式。")]
-        public TestCameraMode mode = TestCameraMode.Follow;
+        public LDK2DTestCameraMode mode = LDK2DTestCameraMode.Follow;
 
-        [Tooltip("跟谁。留空会自动找场景里的 TestPlayer2D。")]
+        [Tooltip("跟谁。留空会自动找场景里的 LDK2DTestPlayer。")]
         public Transform target;
 
         [Tooltip("在目标位置之上再加的偏移。默认往上抬 1 个单位，让人物在画面中间偏下。")]
@@ -73,7 +73,7 @@ namespace Terrain2D
         /// </summary>
         public static float ScenePlaneZ()
         {
-            var terrains = Object.FindObjectsOfType<HeightmapTerrain2D>(true);
+            var terrains = Object.FindObjectsOfType<LDK2DHeightmapTerrain>(true);
             if (terrains.Length == 0) return 0f;
 
             float sum = 0f;
@@ -101,7 +101,7 @@ namespace Terrain2D
         }
 
         /// <summary>换模式。会重新抓锁定点，所以"仅水平"保留的是切换瞬间的 Y。</summary>
-        public void SetMode(TestCameraMode next)
+        public void SetMode(LDK2DTestCameraMode next)
         {
             mode = next;
             CaptureLock();
@@ -125,7 +125,7 @@ namespace Terrain2D
         /// </summary>
         public Transform FindTarget()
         {
-            var player = Object.FindObjectOfType<TestPlayer2D>(true);
+            var player = Object.FindObjectOfType<LDK2DTestPlayer>(true);
             return player != null ? player.transform : null;
         }
 
@@ -174,10 +174,10 @@ namespace Terrain2D
 
             switch (mode)
             {
-                case TestCameraMode.Fixed:
+                case LDK2DTestCameraMode.Fixed:
                     return new Vector3(_lockedPoint.x, _lockedPoint.y, z);
 
-                case TestCameraMode.HorizontalOnly:
+                case LDK2DTestCameraMode.HorizontalOnly:
                 {
                     Transform t = ResolveTarget();
                     if (t == null) return new Vector3(here.x, here.y, z);
@@ -185,7 +185,7 @@ namespace Terrain2D
                     return new Vector3(t.position.x + offset.x, _lockedPoint.y, z);
                 }
 
-                case TestCameraMode.VerticalOnly:
+                case LDK2DTestCameraMode.VerticalOnly:
                 {
                     Transform t = ResolveTarget();
                     if (t == null) return new Vector3(here.x, here.y, z);

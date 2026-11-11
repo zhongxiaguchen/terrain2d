@@ -1,9 +1,9 @@
 using UnityEngine;
 
-namespace Terrain2D
+namespace LDK2D
 {
     /// <summary>敌人的行为。和占位标记里「敌人」的四个类型名一一对应。</summary>
-    public enum EnemyBehaviour
+    public enum LDK2DEnemyBehaviour
     {
         [InspectorName("巡逻")] Patrol,
         [InspectorName("飞行")] Fly,
@@ -24,10 +24,10 @@ namespace Terrain2D
     /// 撞到角色会把人弹开（<see cref="knockback"/>）。项目里还没有血量系统，
     /// 所以"受伤"暂时只表现成击退 —— 够用来验证"这个敌人的位置放得对不对"。
     /// </summary>
-    [AddComponentMenu("地形 2D/测试敌人行为")]
-    public class TestEnemy2D : MonoBehaviour
+    [AddComponentMenu("LDK2D/测试敌人行为")]
+    public class LDK2DTestEnemy : MonoBehaviour
     {
-        public EnemyBehaviour behaviour = EnemyBehaviour.Patrol;
+        public LDK2DEnemyBehaviour behaviour = LDK2DEnemyBehaviour.Patrol;
 
         [Header("巡逻 / 飞行")]
         [Tooltip("水平速度（世界单位/秒）。")]
@@ -91,13 +91,13 @@ namespace Terrain2D
             Rigidbody2D body = GetComponent<Rigidbody2D>();
             if (body == null) return;
 
-            body.gravityScale = behaviour == EnemyBehaviour.Fly ? 0f : 1f;
+            body.gravityScale = behaviour == LDK2DEnemyBehaviour.Fly ? 0f : 1f;
         }
 
         void Update()
         {
             if (!Application.isPlaying) return;
-            if (behaviour != EnemyBehaviour.Shoot) return;
+            if (behaviour != LDK2DEnemyBehaviour.Shoot) return;
             if (Time.time < _nextFire) return;
 
             _nextFire = Time.time + fireInterval;
@@ -111,8 +111,8 @@ namespace Terrain2D
 
             switch (behaviour)
             {
-                case EnemyBehaviour.Patrol: Patrol(); break;
-                case EnemyBehaviour.Fly: Fly(); break;
+                case LDK2DEnemyBehaviour.Patrol: Patrol(); break;
+                case LDK2DEnemyBehaviour.Fly: Fly(); break;
                 default: Stand(); break;
             }
         }
@@ -171,7 +171,7 @@ namespace Terrain2D
             Vector2 from = (Vector2)transform.position;
             Vector2 dir = _dir > 0 ? Vector2.right : Vector2.left;
 
-            TestPlayer2D player = FindPlayer();
+            LDK2DTestPlayer player = FindPlayer();
 
             if (player != null)
             {
@@ -189,12 +189,12 @@ namespace Terrain2D
             var sprite = GetComponent<SpriteRenderer>();
             Color color = sprite != null ? sprite.color : Color.red;
 
-            TestProjectile2D.Spawn(from + dir * offset, dir * bulletSpeed, color);
+            LDK2DTestProjectile.Spawn(from + dir * offset, dir * bulletSpeed, color);
         }
 
-        static TestPlayer2D FindPlayer()
+        static LDK2DTestPlayer FindPlayer()
         {
-            return Object.FindObjectOfType<TestPlayer2D>(true);
+            return Object.FindObjectOfType<LDK2DTestPlayer>(true);
         }
 
         /// <summary>碰到角色就把他弹开。触发器和别的敌人不算。</summary>
@@ -213,7 +213,7 @@ namespace Terrain2D
             if (!Application.isPlaying || other == null) return;
             if (Time.time - _lastHit < hitCooldown) return;
 
-            var player = other.GetComponent<TestPlayer2D>();
+            var player = other.GetComponent<LDK2DTestPlayer>();
             if (player == null) return;
 
             var body = player.GetComponent<Rigidbody2D>();

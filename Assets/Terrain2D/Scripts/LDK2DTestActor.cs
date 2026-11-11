@@ -1,9 +1,9 @@
 using UnityEngine;
 
-namespace Terrain2D
+namespace LDK2D
 {
     /// <summary>占位标记的种类。决定颜色、尺寸和可选的类型名。</summary>
-    public enum ActorKind
+    public enum LDK2DActorKind
     {
         Enemy,
         Npc,
@@ -18,7 +18,7 @@ namespace Terrain2D
     ///
     /// **碰撞**：敌人和 NPC 是实心的（走过去会被挡住），奖励点是触发器（不挡人）。
     ///
-    /// **行为**：只有敌人有 —— 挂在同物体上的 <see cref="TestEnemy2D"/> 负责
+    /// **行为**：只有敌人有 —— 挂在同物体上的 <see cref="LDK2DTestEnemy"/> 负责
     /// 巡逻 / 飞行 / 射击 / 静止，撞到角色会把人弹开。NPC 和奖励点纯粹是标记，
     /// 没有任何逻辑（拾取、对话都还没做）。
     ///
@@ -26,11 +26,11 @@ namespace Terrain2D
     /// 地形常有 0.06 ~ 0.3 的缩放，挂上去标记会跟着缩成一点。
     /// </summary>
     [ExecuteAlways]
-    [AddComponentMenu("地形 2D/占位标记")]
-    public class TestActor2D : MonoBehaviour
+    [AddComponentMenu("LDK2D/占位标记")]
+    public class LDK2DTestActor : MonoBehaviour
     {
         [Tooltip("种类。决定默认颜色和类型列表。")]
-        public ActorKind kind = ActorKind.Enemy;
+        public LDK2DActorKind kind = LDK2DActorKind.Enemy;
 
         [Tooltip("类型名。敌人用它对上行为（巡逻 / 飞行 / 射击 / 静止），NPC 和奖励点只是标签。")]
         public string typeName = "巡逻";
@@ -46,7 +46,7 @@ namespace Terrain2D
 
         SpriteRenderer _sprite;
 
-        /// <summary>三个种类的显示名，顺序必须和 <see cref="ActorKind"/> 一致。</summary>
+        /// <summary>三个种类的显示名，顺序必须和 <see cref="LDK2DActorKind"/> 一致。</summary>
         public static readonly string[] KindLabels = { "敌人", "NPC", "奖励点" };
 
         /// <summary>每个种类可选的类型名。第一项是创建时的默认值。</summary>
@@ -57,37 +57,37 @@ namespace Terrain2D
             new[] { "金币", "血包", "存档点" }
         };
 
-        public static string[] TypesOf(ActorKind kind)
+        public static string[] TypesOf(LDK2DActorKind kind)
         {
             int index = (int)kind;
             if (index < 0 || index >= TypeTable.Length) return TypeTable[0];
             return TypeTable[index];
         }
 
-        public static string LabelOf(ActorKind kind)
+        public static string LabelOf(LDK2DActorKind kind)
         {
             int index = (int)kind;
             return index >= 0 && index < KindLabels.Length ? KindLabels[index] : "标记";
         }
 
         /// <summary>种类的默认颜色。</summary>
-        public static Color ColorOf(ActorKind kind)
+        public static Color ColorOf(LDK2DActorKind kind)
         {
             switch (kind)
             {
-                case ActorKind.Npc: return new Color(0.30f, 0.62f, 0.95f, 1f);
-                case ActorKind.Reward: return new Color(0.95f, 0.78f, 0.22f, 1f);
+                case LDK2DActorKind.Npc: return new Color(0.30f, 0.62f, 0.95f, 1f);
+                case LDK2DActorKind.Reward: return new Color(0.95f, 0.78f, 0.22f, 1f);
                 default: return new Color(0.85f, 0.25f, 0.25f, 1f);
             }
         }
 
         /// <summary>种类的默认尺寸。奖励点小一点，NPC 高一点。</summary>
-        public static Vector2 SizeOf(ActorKind kind)
+        public static Vector2 SizeOf(LDK2DActorKind kind)
         {
             switch (kind)
             {
-                case ActorKind.Npc: return new Vector2(0.7f, 1.05f);
-                case ActorKind.Reward: return new Vector2(0.45f, 0.45f);
+                case LDK2DActorKind.Npc: return new Vector2(0.7f, 1.05f);
+                case LDK2DActorKind.Reward: return new Vector2(0.45f, 0.45f);
                 default: return new Vector2(0.8f, 0.8f);
             }
         }
@@ -102,7 +102,7 @@ namespace Terrain2D
         /// 在 <paramref name="position"/> 创建一个占位标记。
         /// 不挂父物体 —— 地形有缩放，挂上去尺寸会跟着缩。
         /// </summary>
-        public static TestActor2D Create(ActorKind kind, int typeIndex, Vector3 position)
+        public static LDK2DTestActor Create(LDK2DActorKind kind, int typeIndex, Vector3 position)
         {
             string[] types = TypesOf(kind);
             typeIndex = Mathf.Clamp(typeIndex, 0, types.Length - 1);
@@ -111,10 +111,10 @@ namespace Terrain2D
 
             // **先关掉再挂组件。**
             //
-            // TestActor2D 带 [ExecuteAlways]，而 new GameObject 出来是激活的 ——
+            // LDK2DTestActor 带 [ExecuteAlways]，而 new GameObject 出来是激活的 ——
             // AddComponent 那一刻 OnEnable 会**同步**跑一遍。如果先挂组件、后赋 kind，
-            // 那一次 OnEnable 读到的 kind 还是字段默认值（ActorKind.Enemy），
-            // NPC 和奖励点就会被错挂上 Rigidbody2D + TestEnemy2D，变成会走路、
+            // 那一次 OnEnable 读到的 kind 还是字段默认值（LDK2DActorKind.Enemy），
+            // NPC 和奖励点就会被错挂上 Rigidbody2D + LDK2DTestEnemy，变成会走路、
             // 会掉、还会击退玩家的"金币"。
             //
             // 关掉物体再挂，OnEnable 就不会跑；字段全部就位后再打开，
@@ -123,7 +123,7 @@ namespace Terrain2D
 
             go.transform.position = new Vector3(position.x, position.y, position.z);
 
-            var actor = go.AddComponent<TestActor2D>();
+            var actor = go.AddComponent<LDK2DTestActor>();
             actor.kind = kind;
             actor.typeName = types[typeIndex];
             actor.color = ColorOf(kind);
@@ -137,10 +137,10 @@ namespace Terrain2D
             go.SetActive(true);
 
             // 新建的时候类型是明确的，直接按类型表下标指定行为 —— 比按名字反推准。
-            TestEnemy2D enemy = actor.GetComponent<TestEnemy2D>();
+            LDK2DTestEnemy enemy = actor.GetComponent<LDK2DTestEnemy>();
             if (enemy != null)
             {
-                enemy.behaviour = (EnemyBehaviour)Mathf.Clamp(typeIndex, 0, 3);
+                enemy.behaviour = (LDK2DEnemyBehaviour)Mathf.Clamp(typeIndex, 0, 3);
                 actor.ApplyGravity();
             }
 
@@ -152,9 +152,9 @@ namespace Terrain2D
         ///
         /// - 敌人 / NPC：**实心**，走过去会被挡住
         /// - 奖励点：**触发器**，人不被挡，将来拾取判定就挂在这上面
-        /// - 敌人额外挂 <see cref="TestEnemy2D"/>，行为按 <see cref="typeName"/> 反推
+        /// - 敌人额外挂 <see cref="LDK2DTestEnemy"/>，行为按 <see cref="typeName"/> 反推
         ///
-        /// 这个方法是给"自愈"用的：早先创建的敌人身上只有 <see cref="TestActor2D"/>，
+        /// 这个方法是给"自愈"用的：早先创建的敌人身上只有 <see cref="LDK2DTestActor"/>，
         /// 没有刚体也没有行为组件，进了 Play 就是块不动的砖。放在 OnEnable 里补一次，
         /// 老场景不用手动重建。
         /// </summary>
@@ -167,9 +167,9 @@ namespace Terrain2D
             // 所以碰撞盒填 1×1，缩放之后和方块严丝合缝。
             box.size = Vector2.one;
             box.offset = Vector2.zero;
-            box.isTrigger = kind == ActorKind.Reward;
+            box.isTrigger = kind == LDK2DActorKind.Reward;
 
-            if (kind != ActorKind.Enemy)
+            if (kind != LDK2DActorKind.Enemy)
             {
                 // 兜底：老版本 Create() 的时序 bug 会给 NPC / 奖励点错挂上敌人的
                 // 刚体和行为脚本。场景里已经存在的那些靠这一步自愈，不用删了重建。
@@ -180,11 +180,11 @@ namespace Terrain2D
             Rigidbody2D body = GetComponent<Rigidbody2D>();
             if (body == null) body = gameObject.AddComponent<Rigidbody2D>();
 
-            TestEnemy2D enemy = GetComponent<TestEnemy2D>();
+            LDK2DTestEnemy enemy = GetComponent<LDK2DTestEnemy>();
 
             if (enemy == null)
             {
-                enemy = gameObject.AddComponent<TestEnemy2D>();
+                enemy = gameObject.AddComponent<LDK2DTestEnemy>();
 
                 // 只有**刚补上的**才按名字猜行为。已经在的说明用户可能手动调过，
                 // 每次域重载都重置会把人的修改吃掉。
@@ -199,7 +199,7 @@ namespace Terrain2D
             //
             // 只在 Play 模式下赋材质 —— 这份 PhysicsMaterial2D 是运行时 new 出来的
             // （HideAndDontSave），编辑模式下塞给组件会被写进场景再丢成空引用，
-            // 每次重编译都会把场景标脏。TestPlayer2D 也是同样的处理。
+            // 每次重编译都会把场景标脏。LDK2DTestPlayer 也是同样的处理。
             if (Application.isPlaying && body.sharedMaterial == null)
             {
                 body.sharedMaterial = Frictionless;
@@ -211,7 +211,7 @@ namespace Terrain2D
         /// <summary>
         /// 摘掉敌人专属的组件。NPC 和奖励点不需要刚体，也不需要行为。
         ///
-        /// 顺序有意义：先摘 <see cref="TestEnemy2D"/> 再摘 <see cref="Rigidbody2D"/>，
+        /// 顺序有意义：先摘 <see cref="LDK2DTestEnemy"/> 再摘 <see cref="Rigidbody2D"/>，
         /// 免得行为脚本在刚体已经消失的那一帧里还去读 <c>Body.velocity</c>。
         ///
         /// 只在 <see cref="OnEnable"/> 里触发，所以**在 Inspector 里把 kind 从敌人改成
@@ -220,7 +220,7 @@ namespace Terrain2D
         /// </summary>
         void StripEnemyParts()
         {
-            TestEnemy2D enemy = GetComponent<TestEnemy2D>();
+            LDK2DTestEnemy enemy = GetComponent<LDK2DTestEnemy>();
             if (enemy != null) RemoveComponent(enemy);
 
             Rigidbody2D body = GetComponent<Rigidbody2D>();
@@ -244,21 +244,21 @@ namespace Terrain2D
             Rigidbody2D body = GetComponent<Rigidbody2D>();
             if (body == null) return;
 
-            TestEnemy2D enemy = GetComponent<TestEnemy2D>();
-            EnemyBehaviour behaviour = enemy != null ? enemy.behaviour : BehaviourOf(typeName);
+            LDK2DTestEnemy enemy = GetComponent<LDK2DTestEnemy>();
+            LDK2DEnemyBehaviour behaviour = enemy != null ? enemy.behaviour : BehaviourOf(typeName);
 
-            body.gravityScale = behaviour == EnemyBehaviour.Fly ? 0f : 1f;
+            body.gravityScale = behaviour == LDK2DEnemyBehaviour.Fly ? 0f : 1f;
         }
 
         /// <summary>按类型名反推行为。老物体没有下标可用，只能看名字。</summary>
-        static EnemyBehaviour BehaviourOf(string typeName)
+        static LDK2DEnemyBehaviour BehaviourOf(string typeName)
         {
             switch (typeName)
             {
-                case "飞行": return EnemyBehaviour.Fly;
-                case "射击": return EnemyBehaviour.Shoot;
-                case "静止": return EnemyBehaviour.Idle;
-                default: return EnemyBehaviour.Patrol;
+                case "飞行": return LDK2DEnemyBehaviour.Fly;
+                case "射击": return LDK2DEnemyBehaviour.Shoot;
+                case "静止": return LDK2DEnemyBehaviour.Idle;
+                default: return LDK2DEnemyBehaviour.Patrol;
             }
         }
 
@@ -270,7 +270,7 @@ namespace Terrain2D
             {
                 if (_frictionless == null)
                 {
-                    _frictionless = new PhysicsMaterial2D("Terrain2D 占位标记（无摩擦）")
+                    _frictionless = new PhysicsMaterial2D("LDK2D 占位标记（无摩擦）")
                     {
                         friction = 0f,
                         bounciness = 0f,
@@ -345,7 +345,7 @@ namespace Terrain2D
 
             var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
             {
-                name = "Terrain2D 占位标记",
+                name = "LDK2D 占位标记",
                 filterMode = FilterMode.Point,
                 hideFlags = HideFlags.HideAndDontSave
             };
@@ -363,7 +363,7 @@ namespace Terrain2D
                 new Vector2(0.5f, 0.5f),
                 size);
 
-            sprite.name = "Terrain2D 占位标记";
+            sprite.name = "LDK2D 占位标记";
             sprite.hideFlags = HideFlags.HideAndDontSave;
 
             return sprite;
