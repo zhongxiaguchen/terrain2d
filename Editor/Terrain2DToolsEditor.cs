@@ -185,9 +185,6 @@ namespace Terrain2D.EditorTools
 
             InspectorL10n.Section("碰撞");
             Field("buildColliders", "生成碰撞体");
-            Field("buildEdgeCollider", "生成边缘碰撞体");
-            Field("edgeRadius", "边缘厚度");
-            Field("buildPolygonCollider", "生成多边形碰撞体");
             Field("colliderOffsetY", "碰撞体垂直偏移");
             Field("colliderStride", "碰撞体采样间隔");
 
