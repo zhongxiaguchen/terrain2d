@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.3] - 2026-11-12
+
+### Fixed
+
+- **空场景里「场景显示层级」整块不显示**（`Editor/LDK2DSceneDepthVisibility.cs`）。
+
+  跟 0.20.2 的缩放工具箱是同一个毛病：`DrawPanel()` 开头
+  `if (all == null || all.Length == 0) return;`，场景里没有 `Renderer` 就整块跳过。
+  空工程里「资产替换」面板只剩一句提示，看着像功能没装上。
+
+  改成常驻：Z 输入框、计数、开关、碰撞体显示都在，只是计数是「0 个」、
+  开关禁用，底部那句「关层级只关渲染器」换成「场景里还没有可见物体」。
+  说明文字跟着状态换，否则一个「0 个」加一排灰按钮看着像坏了。
+
 ## [0.20.2] - 2026-11-12
 
 ### Fixed

@@ -21,6 +21,10 @@ namespace LDK2D.EditorTools
     /// （背景 / 地面 / 前景），`LDK2DDepthPresets` 里已经存着了，直接复用那一份。
     /// 面板底部仍然把场景里实际存在的 Z 列出来当参考，省得靠猜。
     ///
+    /// **面板是常驻的**：场景里一个渲染器都没有时也照画，只是「0 个」、开关禁用、
+    /// 底下换成一句说明。原来写成"没有渲染器就整块 return"，结果空场景里这块面板
+    /// 凭空消失，装完包的人会以为功能没装上 —— 常驻面板不该以"场景里恰好有东西"为前提。
+    ///
     /// 为什么挂到 <see cref="LDK2DSceneToolbarLayout.AssetPanelExtra"/> 而不是被
     /// `LDK2DSortingOrderToolbar` 直接调用：那个文件比这个文件老，旧文件引用新类型
     /// 会在 Unity 增量编译「先编译、后导入」的那一轮报 `does not contain a definition`。
@@ -76,7 +80,7 @@ namespace LDK2D.EditorTools
         static void DrawPanel()
         {
             Renderer[] all = ResolveRenderers();
-            if (all == null || all.Length == 0) return;
+            if (all == null) all = System.Array.Empty<Renderer>();
 
             GUILayout.Space(4f);
 
@@ -84,6 +88,7 @@ namespace LDK2D.EditorTools
 
             DrawZRow();
 
+            // 空数组进来是安全的：这里只会把计数清成 0，开关跟着变灰。
             CollectMatched(all);
 
             DrawToggleRow();
@@ -99,7 +104,12 @@ namespace LDK2D.EditorTools
 
             DrawKnownZ(all);
 
-            GUILayout.Label("关层级只关渲染器，碰撞体始终保留。", NoteStyle);
+            // 空场景时换一句说明 —— 不然上面那个「0 个」加灰按钮看着像坏了。
+            if (all.Length == 0)
+                GUILayout.Label("场景里还没有可见物体。放个 Sprite 或建一块地形，这里就会列出它们的 Z。",
+                                NoteStyle);
+            else
+                GUILayout.Label("关层级只关渲染器，碰撞体始终保留。", NoteStyle);
         }
 
         /// <summary>Z 输入框 + 预设下拉。两条路都只是把 <see cref="_targetZ"/> 改掉。</summary>
