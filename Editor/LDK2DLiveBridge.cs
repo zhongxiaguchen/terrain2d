@@ -159,6 +159,10 @@ namespace LDK2D.EditorTools
             public int seed;
             public int passes;
 
+            // create 用：采样点数 / 间距。0 表示用创建时的默认值。
+            public int samples;
+            public float spacing;
+
             public string kind;
             public string name;
             public string note;
@@ -399,6 +403,9 @@ namespace LDK2D.EditorTools
 
                     case "remove":
                         return DoRemove(cmd);
+
+                    case "create":
+                        return DoCreate(cmd);
                 }
 
                 LDK2DHeightmapTerrain terrain = ResolveTerrain(cmd.target);
@@ -683,6 +690,66 @@ namespace LDK2D.EditorTools
             });
 
             _terrainsDirty = true;
+            return Result.Ok;
+        }
+
+        /// <summary>
+        /// 新建一块地形。这是「AI 从零搭关卡」缺的那块拼图 —— 只能改已有地形的话，
+        /// 空地上什么都建不出来。
+        ///
+        /// 创建逻辑直接复用工具栏那个 <see cref="LDK2DToolsEditor.CreateTerrain"/>，
+        /// 不另写一份 —— 否则"面板能做的 AI 做不到"，两边行为会慢慢分叉。
+        /// 唯一的区别是位置：工具栏摆在视口中心，这里按命令给的坐标摆。
+        /// </summary>
+        static Result DoCreate(Command cmd)
+        {
+            string kind = string.IsNullOrEmpty(cmd.kind) ? "terrain" : cmd.kind.Trim().ToLowerInvariant();
+
+            if (kind != "terrain" && kind != "地形")
+            {
+                Fail(cmd, "create 只支持 terrain，收到：" + kind);
+                return Result.Failed;
+            }
+
+            BeginUndo();
+
+            LDK2DHeightmapTerrain terrain = LDK2DToolsEditor.CreateTerrain(null);
+            if (terrain == null)
+            {
+                Fail(cmd, "创建地形失败");
+                return Result.Failed;
+            }
+
+            GameObject go = terrain.gameObject;
+
+            if (!string.IsNullOrEmpty(cmd.name)) go.name = cmd.name;
+
+            Undo.RecordObject(go.transform, "AI 创建地形");
+            go.transform.position = new Vector3(cmd.x, cmd.y, 0f);
+
+            Undo.RecordObject(terrain, "AI 创建地形");
+
+            if (cmd.samples >= 2) terrain.sampleCount = cmd.samples;
+            if (cmd.spacing > 0f) terrain.spacing = cmd.spacing;
+
+            // 给了形状就直接铺上去；没给就按新参数重建一次（噪声生成的默认形状）。
+            if (cmd.values != null && cmd.values.Length > 0) terrain.SetHeightsRange(0, cmd.values);
+            else terrain.Rebuild();
+
+            MarkAi(terrain);
+            _terrainsDirty = true;
+
+            Emit(sb =>
+            {
+                sb.Append("\"kind\":\"created\"");
+                sb.Append(",\"cmd\":");
+                Str(sb, cmd.id);
+                sb.Append(",\"target\":");
+                Str(sb, IdOf(go));
+                sb.Append(",\"samples\":").Append(terrain.sampleCount);
+                sb.Append(",\"spacing\":").Append(Num(terrain.spacing));
+            });
+
             return Result.Ok;
         }
 

@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-11-11
+
+### Added
+
+- **命令通道新增 `create` op：在空地上从零建一块地形**
+  （`Editor/LDK2DLiveBridge.cs`）。
+
+  之前通道只能改已有地形 —— 空地上什么都建不出来，"AI 搭关卡"这句话是空的。
+  现在可以：
+
+  ```jsonc
+  {"op":"create","kind":"terrain","name":"城堡","x":32,"y":-7,
+   "samples":192,"spacing":0.25,"values":[0,0,0,...]}
+  ```
+
+  `values` 给了就直接铺成这个形状（一次 `SetHeightsRange`），不给就按新参数
+  重建一次噪声形状。
+
+  创建逻辑**直接复用** `LDK2DToolsEditor.CreateTerrain`，不另写一份 ——
+  否则"面板能做的 AI 做不到"，两边行为会慢慢分叉。唯一区别是位置：
+  工具栏摆在视口中心，这里按命令给的坐标摆。
+
+  和 `spawn` / `remove` 一样，`create` 不受"人正在拖这块地形"的排队规则限制
+  （它操作的是还不存在的物体），但整条命令仍然是一步 Ctrl+Z。
+
+
 ## [0.19.1] - 2026-11-11
 
 ### Fixed
