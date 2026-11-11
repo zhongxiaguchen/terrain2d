@@ -1,6 +1,6 @@
 {
   "name": "com.zhongxiaguchen.terrain2d",
-  "version": "0.18.1",
+  "version": "0.18.2",
   "displayName": "Terrain 2D",
   "description": "Editable 2D ground for Unity. An equal-spacing height field with a per-X height query, four independently editable edges (top / bottom / left / right), surface-following UVs for constant texel density on slopes, runtime destruction, seeded procedural generation, and automatic mesh + collider generation. A three-stage viewport toolbar walks the level through blockout, testing, and asset handoff, and ships with a controllable test character. Aimed at platformers that need destructible or procedurally generated terrain.",
   "unity": "2022.3",

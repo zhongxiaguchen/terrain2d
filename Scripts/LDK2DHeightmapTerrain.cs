@@ -206,6 +206,19 @@ namespace LDK2D
         // 沿用耳切那套索引 —— 表现是地形三角形全乱。
         bool _lastMeshWasStrip;
 
+        // ---- 拖动期间碰撞体降频 ----
+        //
+        // 重建里最贵的一步是 PolygonCollider2D.SetPath：它要把整条轮廓重新做成
+        // 物理形状并烘一遍。拖点的时候每帧都做，帧时间就全耗在这上面了。
+        //
+        // 视觉必须每帧跟（不然拖起来像卡带），物理不必 —— 100ms 的碰撞滞后，
+        // 角色连一个身位都跑不到，人完全感知不出来。
+        const float InteractiveColliderInterval = 0.1f;
+
+        bool _interactive;
+        bool _colliderDirty;
+        float _lastColliderTime = -1f;
+
         // 地表 X 是否严格递增。自由横拖可以把某个点的 X 拖过它的邻居，那样二分查找
         // 就不成立了。SampleHeight 可能被寻路/刷怪每帧调用，所以结果缓存起来，
         // 只在形状变化（Rebuild / 拖点）时失效。
@@ -1262,10 +1275,53 @@ namespace LDK2D
             //
             // 直接改 Inspector 的勾选框走的是 OnValidate → Rebuild()，
             // 根本不经过 SetCollisionEnabled()，所以这里必须兜住。
-            if (buildColliders) BuildColliders();
-            else DisableColliders();
+            if (!buildColliders)
+            {
+                DisableColliders();
+            }
+            else if (_interactive &&
+                     Time.realtimeSinceStartup - _lastColliderTime < InteractiveColliderInterval)
+            {
+                // 拖动中：这一帧跳过碰撞体，记一笔"欠着"，松手时补。
+                // 每 100ms 会放行一次，所以长按拖也不会让碰撞一直停在旧形状上。
+                _colliderDirty = true;
+            }
+            else
+            {
+                _lastColliderTime = Time.realtimeSinceStartup;
+                _colliderDirty = false;
+                BuildColliders();
+            }
 
             ApplyVisuals();
+        }
+
+        /// <summary>
+        /// 进入「正在拖动」状态。拖动期间碰撞体降频更新（每 100ms 一次），
+        /// 视觉网格照常每帧重建。
+        ///
+        /// 由编辑器侧在鼠标按下 / 松开时调 —— 运行时代码不该知道"拖"这件事，
+        /// 但降频的判断必须在这里，因为 `SetPath` 是在这里调的。
+        /// </summary>
+        public void BeginInteractiveEdit()
+        {
+            _interactive = true;
+        }
+
+        /// <summary>
+        /// 结束拖动。碰撞体如果落后了，这里补最后一次，保证松手之后碰撞是准的。
+        /// </summary>
+        public void EndInteractiveEdit()
+        {
+            if (!_interactive) return;
+            _interactive = false;
+
+            if (!_colliderDirty) return;
+
+            _colliderDirty = false;
+            _lastColliderTime = Time.realtimeSinceStartup;
+
+            if (buildColliders) BuildColliders();
         }
 
         /// <summary>
