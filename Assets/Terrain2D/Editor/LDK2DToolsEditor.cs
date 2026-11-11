@@ -101,6 +101,11 @@ namespace LDK2D.EditorTools
         // 直接把鼠标位移投影到拖动轴上，得到相对抓取点的绝对偏移 —— 不累积、不自激。
         int _dragKind;              // 0=无 1=地表点 2=底部点 3=左边界 4=右边界 5=底边整体
                                     // 6=左斜边 7=右斜边 8=左边链点 9=右边链点 10=底边折线点
+
+        // 正在被拖的地形。松手时要通知它"拖动结束"（补一次碰撞体）。
+        // 不存引用的话 EndDrag 拿不到 —— 那时候选中可能已经变了。
+        LDK2DHeightmapTerrain _dragTerrain;
+
         int _dragIndex = -1;
         Vector2 _dragStartMouse;
         Vector3 _dragStartWorld;
@@ -334,6 +339,17 @@ namespace LDK2D.EditorTools
         }
 
         // ------------------------------------------------------------------ Scene 视图
+
+        /// <summary>
+        /// 拖动没走完就被打断时兜底 —— 切选中、编辑器失焦、脚本重编都会走这里。
+        ///
+        /// 不兜的话地形会一直停在"拖动中"状态，碰撞体永远降频，
+        /// 表现是"改完地形以后碰撞还是旧的"，而且 Console 里什么都看不到。
+        /// </summary>
+        void OnDisable()
+        {
+            if (_dragKind != 0) EndDrag();
+        }
 
         void OnSceneGUI()
         {
@@ -1739,11 +1755,21 @@ namespace LDK2D.EditorTools
 
             GUIUtility.hotControl = DragControlId;
             Undo.RecordObject(terrain, "雕刻地形");
+
+            // 告诉地形"开始拖了"：这之后碰撞体降到每 100ms 一次，
+            // 视觉网格照常每帧重建。SetPath 要重建物理形状，是重建里最贵的一步。
+            _dragTerrain = terrain;
+            terrain.BeginInteractiveEdit();
         }
 
         void EndDrag()
         {
             if (GUIUtility.hotControl == DragControlId) GUIUtility.hotControl = 0;
+
+            // 先补碰撞体再清状态：拖动期间碰撞体是欠着的，松手必须补一次，
+            // 否则玩家脚底下的地面会停在拖动中途的形状上。
+            if (_dragTerrain != null) _dragTerrain.EndInteractiveEdit();
+            _dragTerrain = null;
 
             _dragKind = 0;
             _dragIndex = -1;

@@ -225,6 +225,11 @@ Under the hood `LDK2DLiveEditSync` reconciles three things that Unity otherwise 
 The whole write-back is a single undo step. Nothing is written if nothing changed, so an
 empty play session does not dirty the scene.
 
+While you drag, the visual mesh still rebuilds every frame but the collider only refreshes
+every 100 ms (`InteractiveColliderInterval`), with one final catch-up on mouse-up — a
+`PolygonCollider2D.SetPath` rebuilds the physics shape, which is by far the most expensive
+part of a terrain rebuild. Set the interval to `0f` to disable the throttling.
+
 ## Known limitations
 
 - The surface cannot overhang (see above).

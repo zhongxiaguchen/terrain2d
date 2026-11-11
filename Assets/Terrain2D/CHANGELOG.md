@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.2] - 2026-11-11
+
+### Changed
+
+- **拖动地形时碰撞体降频到 10Hz，视觉网格照常 60Hz**
+  （改 `Scripts/LDK2DHeightmapTerrain.cs` / `Editor/LDK2DToolsEditor.cs`）。
+
+  0.18.1 把分配压掉之后，`Rebuild()` 里最贵的一步就剩
+  `PolygonCollider2D.SetPath` —— 它要重建物理形状并重新烘焙，Play 模式下还会
+  连带触发一次物理重算。而人眼在拖动过程中**根本分辨不出**脚下碰撞体是不是
+  慢了 100 毫秒，所以这笔开销可以省。
+
+  | | 拖动中 | 松手瞬间 |
+  |---|---|---|
+  | 视觉网格 | 每帧重建（不变） | —— |
+  | 碰撞体 | 每 100ms 一次 | 立刻补最后一次 |
+  | 参数 / UV / 材质 | 每帧更新（不变） | —— |
+
+  **"欠着"的记账**：被跳过的那一帧在组件上记 `_colliderDirty = true`。
+  `EndInteractiveEdit()` 发现欠着就补一次，所以松手之后碰撞一定是准的 ——
+  不会出现"拖完地形，人站在地面上往下掉"。
+
+  **`Rebuild()` 不判断"在不在拖"，只判断 `_interactive` 标志**。编辑器侧
+  在鼠标按下 / 松开时调 `BeginInteractiveEdit()` / `EndInteractiveEdit()`，
+  运行时代码不知道"拖"这回事。`SetPath` 在运行时组件里，所以降频的判断
+  必须也在那里。
+
+### Fixed
+
+- **拖动被中途打断后碰撞体永久停在旧形状**（`Editor/LDK2DToolsEditor.cs`）。
+
+  切选中、编辑器失焦、脚本重编译都会让 `OnSceneGUI` 不再收到鼠标抬起事件，
+  `EndDrag()` 永远不执行 —— 地形就卡在"拖动中"，碰撞体一直降频且没人补。
+  表现是"改完地形，碰撞还是旧的"，Console 里一个字都没有。
+
+  新增 `OnDisable()`：只要 `_dragKind != 0` 就强制 `EndDrag()`，补上欠的碰撞体。
+
+### Notes
+
+- 只改了更新节奏，碰撞体形状的计算逻辑没动。
+- 想关掉降频、每次都重建：把 `InteractiveColliderInterval` 改成 `0f` 即可。
+
+
 ## [0.18.1] - 2026-11-11
 
 ### Changed
