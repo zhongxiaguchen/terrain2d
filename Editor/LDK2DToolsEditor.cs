@@ -2,38 +2,38 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace Terrain2D.EditorTools
+namespace LDK2D.EditorTools
 {
-    [CustomEditor(typeof(PolygonMesh2D))]
-    public class PolygonMesh2DEditor : UnityEditor.Editor
+    [CustomEditor(typeof(LDK2DPolygonMesh))]
+    public class LDK2DPolygonMeshEditor : UnityEditor.Editor
     {
-        static readonly System.Type ComponentType = typeof(PolygonMesh2D);
+        static readonly System.Type ComponentType = typeof(LDK2DPolygonMesh);
 
         public override void OnInspectorGUI()
         {
-            var component = (PolygonMesh2D)target;
+            var component = (LDK2DPolygonMesh)target;
 
             serializedObject.Update();
 
-            InspectorL10n.ScriptField(serializedObject);
+            LDK2DInspectorL10n.ScriptField(serializedObject);
 
-            InspectorL10n.Section("轮廓来源");
+            LDK2DInspectorL10n.Section("轮廓来源");
             Field("source", "轮廓来源");
             Field("outline", "轮廓");
             Field("points", "本地顶点列表");
 
-            InspectorL10n.Section("外观");
+            LDK2DInspectorL10n.Section("外观");
             Field("color", "颜色");
             Field("applyColor", "应用颜色");
             Field("sortingLayerName", "排序层");
             Field("sortingOrder", "排序顺序");
 
-            InspectorL10n.Section("网格");
+            LDK2DInspectorL10n.Section("网格");
             Field("uvScale", "UV 缩放");
             Field("zOffset", "Z 偏移");
             Field("flipWinding", "翻转绕序");
 
-            InspectorL10n.Section("实时更新");
+            LDK2DInspectorL10n.Section("实时更新");
             Field("liveUpdate", "实时更新");
 
             serializedObject.ApplyModifiedProperties();
@@ -69,15 +69,15 @@ namespace Terrain2D.EditorTools
 
             EditorGUILayout.PropertyField(
                 property,
-                InspectorL10n.Label(ComponentType, property, label),
+                LDK2DInspectorL10n.Label(ComponentType, property, label),
                 true);
         }
     }
 
-    [CustomEditor(typeof(HeightmapTerrain2D))]
-    public class HeightmapTerrain2DEditor : UnityEditor.Editor
+    [CustomEditor(typeof(LDK2DHeightmapTerrain))]
+    public class LDK2DHeightmapTerrainEditor : UnityEditor.Editor
     {
-        static readonly System.Type ComponentType = typeof(HeightmapTerrain2D);
+        static readonly System.Type ComponentType = typeof(LDK2DHeightmapTerrain);
 
         // 编辑模式下鼠标到控制点/线段的命中范围（屏幕像素）。
         const float HandlePickRadius = 14f;
@@ -134,20 +134,20 @@ namespace Terrain2D.EditorTools
         /// 所以默认给 true。它只控制**画不画控制点** —— 左上角那块阶段面板
         /// 和编辑模式无关，任何时候都在。
         /// </summary>
-        static bool IsEditing(HeightmapTerrain2D terrain)
+        static bool IsEditing(LDK2DHeightmapTerrain terrain)
         {
             return SessionState.GetBool(EditKey(terrain.GetInstanceID()), true);
         }
 
         public override void OnInspectorGUI()
         {
-            var terrain = (HeightmapTerrain2D)target;
+            var terrain = (LDK2DHeightmapTerrain)target;
 
             serializedObject.Update();
 
-            InspectorL10n.ScriptField(serializedObject);
+            LDK2DInspectorL10n.ScriptField(serializedObject);
 
-            InspectorL10n.Section("形状");
+            LDK2DInspectorL10n.Section("形状");
             Field("sampleCount", "采样点数量");
             Field("spacing", "采样间距");
             Field("originX", "起始 X");
@@ -162,7 +162,7 @@ namespace Terrain2D.EditorTools
                 Field("bottomRightOffsetX", "底部右端点水平偏移");
             }
 
-            InspectorL10n.Section("程序化生成");
+            LDK2DInspectorL10n.Section("程序化生成");
             Field("generateOnEnable", "启用时自动生成");
             Field("seed", "随机种子");
             Field("baseHeight", "基准高度");
@@ -173,7 +173,7 @@ namespace Terrain2D.EditorTools
             Field("lacunarity", "频率放大");
             Field("smoothPasses", "平滑遍数");
 
-            InspectorL10n.Section("外观");
+            LDK2DInspectorL10n.Section("外观");
             Field("color", "颜色");
             Field("applyColor", "应用颜色");
             Field("sortingLayerName", "排序层");
@@ -183,15 +183,15 @@ namespace Terrain2D.EditorTools
             Field("showUVGrid", "显示 UV 网格");
             Field("flipWinding", "翻转绕序");
 
-            InspectorL10n.Section("碰撞");
+            LDK2DInspectorL10n.Section("碰撞");
             Field("buildColliders", "生成碰撞体");
             Field("colliderOffsetY", "碰撞体垂直偏移");
             Field("colliderStride", "碰撞体采样间隔");
 
-            InspectorL10n.Section("实时更新");
+            LDK2DInspectorL10n.Section("实时更新");
             Field("rebuildOnValidate", "参数变化时重建");
 
-            InspectorL10n.Section("Scene 视图");
+            LDK2DInspectorL10n.Section("Scene 视图");
             Field("showSceneHandles", "显示控制点");
             Field("sceneHandleStride", "控制点间隔");
             Field("smoothDrag", "平滑拖动");
@@ -246,7 +246,7 @@ namespace Terrain2D.EditorTools
                 MessageType.Info);
         }
 
-        void DrawEditModeUI(HeightmapTerrain2D terrain)
+        void DrawEditModeUI(LDK2DHeightmapTerrain terrain)
         {
             bool editing = IsEditing(terrain);
 
@@ -315,7 +315,7 @@ namespace Terrain2D.EditorTools
             }
         }
 
-        void MarkDirty(HeightmapTerrain2D terrain)
+        void MarkDirty(LDK2DHeightmapTerrain terrain)
         {
             EditorUtility.SetDirty(terrain);
             Repaint();
@@ -329,7 +329,7 @@ namespace Terrain2D.EditorTools
 
             EditorGUILayout.PropertyField(
                 property,
-                InspectorL10n.Label(ComponentType, property, label),
+                LDK2DInspectorL10n.Label(ComponentType, property, label),
                 true);
         }
 
@@ -337,7 +337,7 @@ namespace Terrain2D.EditorTools
 
         void OnSceneGUI()
         {
-            var terrain = (HeightmapTerrain2D)target;
+            var terrain = (LDK2DHeightmapTerrain)target;
 
             int count = terrain.sampleCount;
             if (count < 2) return;
@@ -662,7 +662,7 @@ namespace Terrain2D.EditorTools
         /// 平地上等距、**斜坡上沿着坡面看也仍然等距**，说明映射是对的；
         /// 如果斜坡上的刻度被拉稀或被挤密，说明 U 还在按世界 X 铺，不是按弧长。
         /// </summary>
-        void DrawUVGrid(HeightmapTerrain2D terrain, Transform tr)
+        void DrawUVGrid(LDK2DHeightmapTerrain terrain, Transform tr)
         {
             float total = terrain.SurfaceLength;
             float step = terrain.uvScale > 1e-5f ? 1f / terrain.uvScale : 1f;
@@ -691,7 +691,7 @@ namespace Terrain2D.EditorTools
         }
 
         /// <summary>按弧长反查采样点下标。弧长是单调累加的，二分就行。</summary>
-        static int IndexAtArcLength(HeightmapTerrain2D terrain, float distance)
+        static int IndexAtArcLength(LDK2DHeightmapTerrain terrain, float distance)
         {
             int lo = 0;
             int hi = terrain.sampleCount - 1;
@@ -706,7 +706,7 @@ namespace Terrain2D.EditorTools
             return lo;
         }
 
-        void DrawOutline(HeightmapTerrain2D terrain, Transform tr, float[] top, float[] bottom, int count)
+        void DrawOutline(LDK2DHeightmapTerrain terrain, Transform tr, float[] top, float[] bottom, int count)
         {
             // 画完整闭合轮廓 —— 四条边都在里面，所以左右边加点后也看得到。
             var outline = new List<Vector2>();
@@ -740,7 +740,7 @@ namespace Terrain2D.EditorTools
 
         // ------------------------------------------------------------------ 阶段
 
-        /// <summary>顺序必须和 HeightmapTerrain2D.UVMode 一致。</summary>
+        /// <summary>顺序必须和 LDK2DHeightmapTerrain.LDK2DUVMode 一致。</summary>
         static readonly string[] UvModeLabels = { "平面映射", "沿曲面平铺" };
 
         // ------------------------------------------------------------------ 阶段面板
@@ -763,16 +763,16 @@ namespace Terrain2D.EditorTools
         /// 左上角的浮动面板，显示**当前阶段**的工具。
         ///
         /// 阶段选择器**不在**这里 —— 它在视口左下角那条固定栏上，由
-        /// SortingOrderToolbar 画。分开的理由是两者的生命周期不同：
+        /// LDK2DSortingOrderToolbar 画。分开的理由是两者的生命周期不同：
         /// 阶段是全局状态，一直在；这里的控件只对"选中的这块地形"有意义，
         /// 换掉选择就该换掉内容。
         /// </summary>
-        void DrawStagePanel(HeightmapTerrain2D terrain)
+        void DrawStagePanel(LDK2DHeightmapTerrain terrain)
         {
             var view = SceneView.currentDrawingSceneView;
             if (view == null) return;
 
-            Rect rect = SceneToolbarLayout.Panel(view.position, SceneToolbarLayout.PanelWidth);
+            Rect rect = LDK2DSceneToolbarLayout.Panel(view.position, LDK2DSceneToolbarLayout.PanelWidth);
 
             Handles.BeginGUI();
             GUILayout.BeginArea(rect);
@@ -792,7 +792,7 @@ namespace Terrain2D.EditorTools
 
             // 阶段名必须写在面板里：选择器在视口另一端，收起来之后光看内容
             // 分不清现在是哪个阶段。
-            GUILayout.Label(TerrainStage.Labels[(int)TerrainStage.Current],
+            GUILayout.Label(LDK2DTerrainStage.Labels[(int)LDK2DTerrainStage.Current],
                             EditorStyles.miniBoldLabel);
 
             GUILayout.FlexibleSpace();
@@ -806,13 +806,13 @@ namespace Terrain2D.EditorTools
                 // 轮廓自交的警告贴在最上面 —— 正在拖点的人一眼就能看到。
                 if (!terrain.OutlineValid) DrawOutlineWarning();
 
-                switch (TerrainStage.Current)
+                switch (LDK2DTerrainStage.Current)
                 {
-                    case WorkStage.Test:
+                    case LDK2DWorkStage.Test:
                         DrawTestRows(terrain);
                         break;
 
-                    case WorkStage.Asset:
+                    case LDK2DWorkStage.Asset:
                         DrawAssetRows(terrain);
                         break;
 
@@ -859,22 +859,22 @@ namespace Terrain2D.EditorTools
         }
 
         /// <summary>标题行右侧的关键数字。窄面板放不下长句子，只留一个数。</summary>
-        string StageSummary(HeightmapTerrain2D terrain)
+        string StageSummary(LDK2DHeightmapTerrain terrain)
         {
-            switch (TerrainStage.Current)
+            switch (LDK2DTerrainStage.Current)
             {
-                case WorkStage.Test:
+                case LDK2DWorkStage.Test:
                 {
                     // 场景里有几个测试角色是这里最该先看到的数 —— 复制粘贴测试角色之后
                     // 经常会忘掉多出来的那几个，然后"怎么镜头跟的是另一个"。
                     var rig = FindTestCamera();
-                    TestCameraMode mode = rig != null ? rig.mode : TestCameraPrefs.Mode;
+                    LDK2DTestCameraMode mode = rig != null ? rig.mode : LDK2DTestCameraPrefs.Mode;
 
                     return "角色 " + TestPlayerCount +
-                           "　" + TestCameraPrefs.Labels[(int)mode];
+                           "　" + LDK2DTestCameraPrefs.Labels[(int)mode];
                 }
 
-                case WorkStage.Asset:
+                case LDK2DWorkStage.Asset:
                 {
                     var filter = terrain.GetComponent<MeshFilter>();
                     var mesh = filter != null ? filter.sharedMesh : null;
@@ -893,7 +893,7 @@ namespace Terrain2D.EditorTools
 
         // ------------------------------------------------------------------ 阶段一：搭建
 
-        void DrawBlockoutRows(HeightmapTerrain2D terrain)
+        void DrawBlockoutRows(LDK2DHeightmapTerrain terrain)
         {
             // ---- 外观 ----
             GUILayout.BeginHorizontal();
@@ -916,7 +916,7 @@ namespace Terrain2D.EditorTools
             // 和「任意 2D 物体」那条栏用同一个调色板。
             if (GUILayout.Button("▾", EditorStyles.miniButton, GUILayout.Width(18f)))
             {
-                ColorPalette.ShowMenu(terrain.color, chosen =>
+                LDK2DColorPalette.ShowMenu(terrain.color, chosen =>
                 {
                     Undo.RecordObject(terrain, "改地形颜色");
                     terrain.color = chosen;
@@ -1027,7 +1027,7 @@ namespace Terrain2D.EditorTools
         /// 层级 / Z 这一行。只在搭建阶段出现 —— 分层是灰盒阶段就该定下来的事，
         /// 到了测试和资产替换阶段再改层级，说明前面的规范没定住。
         /// </summary>
-        void DrawLayerRow(HeightmapTerrain2D terrain)
+        void DrawLayerRow(LDK2DHeightmapTerrain terrain)
         {
             GUILayout.BeginHorizontal();
 
@@ -1069,7 +1069,7 @@ namespace Terrain2D.EditorTools
             // 和「任意 2D 物体」那条栏用同一套 Z 预设。
             if (GUILayout.Button("▾", EditorStyles.miniButton, GUILayout.Width(18f)))
             {
-                DepthPresets.ShowMenu(terrain.transform.position.z, chosen =>
+                LDK2DDepthPresets.ShowMenu(terrain.transform.position.z, chosen =>
                 {
                     Undo.RecordObject(terrain.transform, "改地形 Z");
                     Vector3 position = terrain.transform.position;
@@ -1099,7 +1099,7 @@ namespace Terrain2D.EditorTools
         /// 测的时候用来确认"掉下去是不是因为碰撞压根没生成"。
         /// 抽成一份两边共用，免得语义漂移。
         /// </summary>
-        void DrawColliderToggle(HeightmapTerrain2D terrain)
+        void DrawColliderToggle(LDK2DHeightmapTerrain terrain)
         {
             // 和「任意 2D 物体」那条工具栏语义对齐：
             // 取消勾选 = 不再自动生成 + 已有碰撞体全部禁用。
@@ -1124,16 +1124,16 @@ namespace Terrain2D.EditorTools
 
         // ------------------------------------------------------------------ 阶段二：测试
 
-        TestPlayer2D _testPlayer;
+        LDK2DTestPlayer _testPlayer;
 
         /// <summary>
         /// 找场景里的测试角色。Unity 的"假 null"在这里刚好帮了忙：
         /// 物体被删掉之后这个引用会等于 null，下次自动重新找一遍，不用手动清缓存。
         /// </summary>
-        TestPlayer2D FindTestPlayer()
+        LDK2DTestPlayer FindTestPlayer()
         {
             if (_testPlayer == null)
-                _testPlayer = UnityEngine.Object.FindObjectOfType<TestPlayer2D>(true);
+                _testPlayer = UnityEngine.Object.FindObjectOfType<LDK2DTestPlayer>(true);
 
             return _testPlayer;
         }
@@ -1151,23 +1151,23 @@ namespace Terrain2D.EditorTools
             {
                 if (_testPlayerCount < 0)
                     _testPlayerCount = UnityEngine.Object
-                        .FindObjectsOfType<TestPlayer2D>(true).Length;
+                        .FindObjectsOfType<LDK2DTestPlayer>(true).Length;
 
                 return _testPlayerCount;
             }
         }
 
-        static TestCamera2D _testCamera;
+        static LDK2DTestCamera _testCamera;
 
-        static TestCamera2D FindTestCamera()
+        static LDK2DTestCamera FindTestCamera()
         {
             if (_testCamera == null)
-                _testCamera = UnityEngine.Object.FindObjectOfType<TestCamera2D>();
+                _testCamera = UnityEngine.Object.FindObjectOfType<LDK2DTestCamera>();
 
             return _testCamera;
         }
 
-        static HeightmapTerrain2DEditor()
+        static LDK2DHeightmapTerrainEditor()
         {
             // 只在"场景里的物体变了"时清缓存。挂在 static 构造里而不是
             // [InitializeOnLoad]，是因为这些缓存只有地形面板会读 —— 没选地形时
@@ -1182,7 +1182,7 @@ namespace Terrain2D.EditorTools
             _testCamera = null;
         }
 
-        void DrawTestRows(HeightmapTerrain2D terrain)
+        void DrawTestRows(LDK2DHeightmapTerrain terrain)
         {
             var player = FindTestPlayer();
 
@@ -1211,11 +1211,11 @@ namespace Terrain2D.EditorTools
                     // select 传 false：选中新物体会让这块地形的面板立刻消失
                     // （OnSceneGUI 只画在选中物体上），点一下按钮工具没了很突兀。
                     // 改用 PingObject 闪一下 Hierarchy，位置留在原地。
-                    var created = Terrain2DMenuItems.BuildTestPlayer(null, false);
+                    var created = LDK2DMenuItems.BuildTestPlayer(null, false);
                     MovePlayerToStart(terrain, created);
 
                     // 角色和镜头是一套测试装备，创建角色就把镜头一起配好。
-                    Terrain2DMenuItems.EnsureTestCamera(TestCameraPrefs.Mode, created.transform);
+                    LDK2DMenuItems.EnsureTestCamera(LDK2DTestCameraPrefs.Mode, created.transform);
 
                     _testPlayer = created;
                     player = created;
@@ -1250,7 +1250,7 @@ namespace Terrain2D.EditorTools
 
             GUILayout.EndHorizontal();
 
-            // ---- 手感参数：直接写 TestPlayer2D 的字段，Play 中拖动立刻生效 ----
+            // ---- 手感参数：直接写 LDK2DTestPlayer 的字段，Play 中拖动立刻生效 ----
             if (player != null)
             {
                 DrawFloatSlider("跳跃高度", player.jumpHeight, 0.5f, 8f, "0.00", value =>
@@ -1336,17 +1336,17 @@ namespace Terrain2D.EditorTools
 
             GUILayout.Label("摄像机", EditorStyles.miniLabel);
 
-            TestCameraMode current = rig != null ? rig.mode : TestCameraPrefs.Mode;
+            LDK2DTestCameraMode current = rig != null ? rig.mode : LDK2DTestCameraPrefs.Mode;
 
             EditorGUI.BeginChangeCheck();
             int picked = EditorGUILayout.Popup(
-                (int)current, TestCameraPrefs.Labels, EditorStyles.popup, GUILayout.Width(78f));
+                (int)current, LDK2DTestCameraPrefs.Labels, EditorStyles.popup, GUILayout.Width(78f));
             bool changed = EditorGUI.EndChangeCheck();
 
             if (changed)
             {
-                var next = (TestCameraMode)picked;
-                TestCameraPrefs.Mode = next;
+                var next = (LDK2DTestCameraMode)picked;
+                LDK2DTestCameraPrefs.Mode = next;
 
                 if (rig != null)
                 {
@@ -1377,7 +1377,7 @@ namespace Terrain2D.EditorTools
             }
 
             // 固定视口没有"跟上的快慢"可言，藏起来免得让人以为它没用。
-            if (rig.mode != TestCameraMode.Fixed)
+            if (rig.mode != LDK2DTestCameraMode.Fixed)
             {
                 DrawFloatSlider("跟随快慢", rig.smoothTime, 0f, 0.6f, "0.00", value =>
                 {
@@ -1407,7 +1407,7 @@ namespace Terrain2D.EditorTools
             GUILayout.EndHorizontal();
         }
 
-        void MovePlayerToStart(HeightmapTerrain2D terrain, TestPlayer2D player)
+        void MovePlayerToStart(LDK2DHeightmapTerrain terrain, LDK2DTestPlayer player)
         {
             if (player == null) return;
 
@@ -1447,7 +1447,7 @@ namespace Terrain2D.EditorTools
 
         // ------------------------------------------------------------------ 阶段三：资产替换
 
-        void DrawAssetRows(HeightmapTerrain2D terrain)
+        void DrawAssetRows(LDK2DHeightmapTerrain terrain)
         {
             // ---- UV 模式 ----
             GUILayout.BeginHorizontal();
@@ -1461,7 +1461,7 @@ namespace Terrain2D.EditorTools
             if (mode != (int)terrain.uvMode)
             {
                 Undo.RecordObject(terrain, "改 UV 模式");
-                terrain.uvMode = (HeightmapTerrain2D.UVMode)mode;
+                terrain.uvMode = (LDK2DHeightmapTerrain.LDK2DUVMode)mode;
                 terrain.Rebuild();
                 MarkDirty(terrain);
             }
@@ -1507,7 +1507,7 @@ namespace Terrain2D.EditorTools
                             "　重复 " + repeat.ToString("0.0") + " 次", EditorStyles.miniLabel);
 
             GUILayout.Label(
-                terrain.uvMode == HeightmapTerrain2D.UVMode.Planar
+                terrain.uvMode == LDK2DHeightmapTerrain.LDK2DUVMode.Planar
                     ? "平面映射在斜坡上会把贴图拉长（1/cos 坡角）。"
                     : "弧长映射，斜坡上密度不变。",
                 NoteStyle);
@@ -1554,7 +1554,7 @@ namespace Terrain2D.EditorTools
             DrawAssetWarnings(terrain, embedded);
         }
 
-        void DrawAssetWarnings(HeightmapTerrain2D terrain, bool embeddedMaterial)
+        void DrawAssetWarnings(LDK2DHeightmapTerrain terrain, bool embeddedMaterial)
         {
             if (_hintStyle == null)
             {
@@ -1595,12 +1595,12 @@ namespace Terrain2D.EditorTools
         /// <summary>
         /// 把自动生成的内嵌材质存成项目资产。
         ///
-        /// 为什么必须这一步：MeshUtil.EnsureMaterial 挂的是运行时 new 出来的 Material，
+        /// 为什么必须这一步：LDK2DMeshUtil.EnsureMaterial 挂的是运行时 new 出来的 Material，
         /// 它没有资产路径 —— 美术在 Project 里找不到、改不了、版本控制也看不见。
         /// AssetDatabase.CreateAsset 是把这个对象**变成**资产（不是复制一份），
         /// 所以渲染器上的引用会跟着变成资产引用，不用重新拖一次。
         /// </summary>
-        void SaveMaterialAsAsset(HeightmapTerrain2D terrain, Material material)
+        void SaveMaterialAsAsset(LDK2DHeightmapTerrain terrain, Material material)
         {
             string path = EditorUtility.SaveFilePanelInProject(
                 "把地形材质存为资产",
@@ -1647,7 +1647,7 @@ namespace Terrain2D.EditorTools
         }
 
         /// <summary>跑一个会改地形数据的操作：登记撤销 + 标脏 + 刷新。</summary>
-        void RunAction(HeightmapTerrain2D terrain, string undoName, System.Action action)
+        void RunAction(LDK2DHeightmapTerrain terrain, string undoName, System.Action action)
         {
             Undo.RecordObject(terrain, undoName);
             action();
@@ -1667,7 +1667,7 @@ namespace Terrain2D.EditorTools
 
         // ------------------------------------------------------------------ 拖动
 
-        void BeginDrag(HeightmapTerrain2D terrain, Transform tr, int kind, int index, Vector3 world, Event e)
+        void BeginDrag(LDK2DHeightmapTerrain terrain, Transform tr, int kind, int index, Vector3 world, Event e)
         {
             _dragKind = kind;
             _dragIndex = index;
@@ -1737,7 +1737,7 @@ namespace Terrain2D.EditorTools
             _dragBaseBottomOffsetX = null;
         }
 
-        void ApplyDrag(HeightmapTerrain2D terrain, Transform tr, Event e)
+        void ApplyDrag(LDK2DHeightmapTerrain terrain, Transform tr, Event e)
         {
             // ---- 自由 2D 拖动：地表点 / 底部点 / 左右边和底边折线上的点 ----
             // 统一把鼠标投影到物体的本地 XY 平面，取相对抓取点的绝对位移。
@@ -1804,7 +1804,7 @@ namespace Terrain2D.EditorTools
                 for (int i = 0; i < count; i++)
                     if (h[i] < lowest) lowest = h[i];
 
-                terrain.bottomY = Mathf.Min(_dragBottomY + delta, lowest - HeightmapTerrain2D.MinThickness);
+                terrain.bottomY = Mathf.Min(_dragBottomY + delta, lowest - LDK2DHeightmapTerrain.MinThickness);
             }
             else if (_dragKind == 6)
             {
@@ -1824,7 +1824,7 @@ namespace Terrain2D.EditorTools
             SceneView.RepaintAll();
         }
 
-        void ApplyCurveDrag(HeightmapTerrain2D terrain, Vector2 localDelta, int count)
+        void ApplyCurveDrag(LDK2DHeightmapTerrain terrain, Vector2 localDelta, int count)
         {
             bool isTop = _dragKind == 1;
 
@@ -1864,8 +1864,8 @@ namespace Terrain2D.EditorTools
                 if (other != null && index < other.Length)
                 {
                     value = isTop
-                        ? Mathf.Max(value, other[index] + HeightmapTerrain2D.MinThickness)
-                        : Mathf.Min(value, other[index] - HeightmapTerrain2D.MinThickness);
+                        ? Mathf.Max(value, other[index] + LDK2DHeightmapTerrain.MinThickness)
+                        : Mathf.Min(value, other[index] - LDK2DHeightmapTerrain.MinThickness);
                 }
 
                 live[index] = value;
@@ -1893,7 +1893,7 @@ namespace Terrain2D.EditorTools
         /// <summary>
         /// 拼出某一条侧边（含两个端点）的折线。左链是"下 -> 上"，右链是"上 -> 下"。
         /// </summary>
-        static void BuildSidePolyline(HeightmapTerrain2D terrain, bool left, List<Vector2> result)
+        static void BuildSidePolyline(LDK2DHeightmapTerrain terrain, bool left, List<Vector2> result)
         {
             result.Clear();
 
@@ -1927,7 +1927,7 @@ namespace Terrain2D.EditorTools
         /// 或开了「底部独立轮廓」之后的逐点数据）。命中判定和加点都用这一条，
         /// 保证"看到哪条就点到哪条"。
         /// </summary>
-        static void BuildBottomPolyline(HeightmapTerrain2D terrain, List<Vector2> result)
+        static void BuildBottomPolyline(LDK2DHeightmapTerrain terrain, List<Vector2> result)
         {
             result.Clear();
 
@@ -1974,7 +1974,7 @@ namespace Terrain2D.EditorTools
             return points[points.Count - 1];
         }
 
-        void HandleInsert(HeightmapTerrain2D terrain, Transform tr, float[] top, float[] bottom,
+        void HandleInsert(LDK2DHeightmapTerrain terrain, Transform tr, float[] top, float[] bottom,
                           int count, Event e)
         {
             int chain, index;
@@ -2033,7 +2033,7 @@ namespace Terrain2D.EditorTools
         /// 找离鼠标最近、且在命中范围内的轮廓线段。
         /// chain：0=地表 1=右边 2=底部 3=左边；index 是该条边内的线段下标。
         /// </summary>
-        bool FindNearestSegment(HeightmapTerrain2D terrain, Transform tr, float[] top, float[] bottom,
+        bool FindNearestSegment(LDK2DHeightmapTerrain terrain, Transform tr, float[] top, float[] bottom,
                                 int count, Vector2 mouse, out int chain, out int index)
         {
             chain = -1;
@@ -2117,9 +2117,9 @@ namespace Terrain2D.EditorTools
         }
     }
 
-    internal static class Terrain2DMenuItems
+    internal static class LDK2DMenuItems
     {
-        [MenuItem("GameObject/地形 2D/为选中的碰撞体添加多边形网格", false, 10)]
+        [MenuItem("GameObject/LDK2D/为选中的碰撞体添加多边形网格", false, 10)]
         static void AddPolygonMesh()
         {
             var collider = Selection.activeGameObject != null
@@ -2132,48 +2132,48 @@ namespace Terrain2D.EditorTools
                 return;
             }
 
-            // PolygonMesh2D 上有 [RequireComponent]，MeshFilter 和 MeshRenderer 会自动补上。
-            var mesh = Undo.AddComponent<PolygonMesh2D>(collider.gameObject);
+            // LDK2DPolygonMesh 上有 [RequireComponent]，MeshFilter 和 MeshRenderer 会自动补上。
+            var mesh = Undo.AddComponent<LDK2DPolygonMesh>(collider.gameObject);
             mesh.outline = collider;
             mesh.Rebuild();
 
             Selection.activeGameObject = collider.gameObject;
         }
 
-        [MenuItem("GameObject/地形 2D/创建高度场地形", false, 11)]
+        [MenuItem("GameObject/LDK2D/创建高度场地形", false, 11)]
         static void CreateHeightmapTerrain(MenuCommand command)
         {
             CreateTerrain(command.context as GameObject);
         }
 
-        [MenuItem("GameObject/地形 2D/创建测试角色", false, 12)]
+        [MenuItem("GameObject/LDK2D/创建测试角色", false, 12)]
         static void CreateTestPlayer(MenuCommand command)
         {
             var player = BuildTestPlayer(command.context as GameObject, true);
 
             // 角色和镜头是一套测试装备。少了镜头，按 Play 跑两步人就没影了。
-            EnsureTestCamera(TestCameraPrefs.Mode, player.transform);
+            EnsureTestCamera(LDK2DTestCameraPrefs.Mode, player.transform);
         }
 
-        [MenuItem("GameObject/地形 2D/创建测试摄像机", false, 13)]
+        [MenuItem("GameObject/LDK2D/创建测试摄像机", false, 13)]
         static void CreateTestCamera()
         {
-            EnsureTestCamera(TestCameraPrefs.Mode, null);
+            EnsureTestCamera(LDK2DTestCameraPrefs.Mode, null);
         }
 
         /// <summary>
         /// 确保场景里有一台测试摄像机，并把它切到指定模式。
         ///
-        /// 优先复用已有的 <see cref="TestCamera2D"/>；没有的话挂在 <c>Camera.main</c> 上；
+        /// 优先复用已有的 <see cref="LDK2DTestCamera"/>；没有的话挂在 <c>Camera.main</c> 上；
         /// 连主摄像机都没有才新建一台。
         ///
         /// 为什么挂在主摄像机上而不是另建一台：同时存在两台启用的摄像机会双份渲染，
         /// 而 2D 项目的主摄像机本来就已经配好了正交尺寸和背景色，加一个跟随组件
         /// 是纯粹的增量 —— 不想要了把组件删掉就行，场景别的部分一点没动。
         /// </summary>
-        public static TestCamera2D EnsureTestCamera(TestCameraMode mode, Transform target)
+        public static LDK2DTestCamera EnsureTestCamera(LDK2DTestCameraMode mode, Transform target)
         {
-            var rig = UnityEngine.Object.FindObjectOfType<TestCamera2D>();
+            var rig = UnityEngine.Object.FindObjectOfType<LDK2DTestCamera>();
 
             if (rig == null)
             {
@@ -2189,12 +2189,12 @@ namespace Terrain2D.EditorTools
                     cam.orthographicSize = 5f;
                 }
 
-                rig = Undo.AddComponent<TestCamera2D>(cam.gameObject);
+                rig = Undo.AddComponent<LDK2DTestCamera>(cam.gameObject);
             }
 
             if (target == null)
             {
-                var player = UnityEngine.Object.FindObjectOfType<TestPlayer2D>(true);
+                var player = UnityEngine.Object.FindObjectOfType<LDK2DTestPlayer>(true);
                 if (player != null) target = player.transform;
             }
 
@@ -2247,7 +2247,7 @@ namespace Terrain2D.EditorTools
             Vector3 pos = new Vector3(
                 view.pivot.x,
                 view.pivot.y,
-                TestCamera2D.ScenePlaneZ() - TestCamera2D.CameraDepth);
+                LDK2DTestCamera.ScenePlaneZ() - LDK2DTestCamera.CameraDepth);
 
             cam.transform.position = pos;
             cam.transform.rotation = view.rotation;
@@ -2259,7 +2259,7 @@ namespace Terrain2D.EditorTools
 
             // 相机上有跟随组件时锁定点要一起更新，否则「仅水平 / 仅垂直 / 固定」
             // 按下 Play 会跳回对齐之前的位置。
-            var rig = cam.GetComponent<TestCamera2D>();
+            var rig = cam.GetComponent<LDK2DTestCamera>();
             if (rig != null)
             {
                 Undo.RecordObject(rig, "对准视口");
@@ -2278,13 +2278,13 @@ namespace Terrain2D.EditorTools
         /// </summary>
         /// <param name="parent">父物体，可以是 null</param>
         /// <param name="select">是否把新物体设为选中</param>
-        public static TestPlayer2D BuildTestPlayer(GameObject parent, bool select)
+        public static LDK2DTestPlayer BuildTestPlayer(GameObject parent, bool select)
         {
             var go = new GameObject("测试角色");
             GameObjectUtility.SetParentAndAlign(go, parent);
             Undo.RegisterCreatedObjectUndo(go, "创建测试角色");
 
-            // 先按顺序把组件摆好，参数也就顺手定了；TestPlayer2D 上的
+            // 先按顺序把组件摆好，参数也就顺手定了；LDK2DTestPlayer 上的
             // [RequireComponent] 只是兜底，不该指望它来配参数。
             var sprite = go.AddComponent<SpriteRenderer>();
             sprite.sortingOrder = 100;
@@ -2297,7 +2297,7 @@ namespace Terrain2D.EditorTools
             capsule.direction = CapsuleDirection2D.Vertical;
             capsule.size = new Vector2(0.62f, 1f);
 
-            var player = go.AddComponent<TestPlayer2D>();
+            var player = go.AddComponent<LDK2DTestPlayer>();
 
             if (parent == null)
             {
@@ -2315,7 +2315,7 @@ namespace Terrain2D.EditorTools
         /// 创建一块高度场地形。parent 为父物体，可以是 null。
         /// 菜单项和视口工具栏的「创建高度场地形」按钮都走这里 —— 后者没有 MenuCommand 可用。
         /// </summary>
-        public static HeightmapTerrain2D CreateTerrain(GameObject parent)
+        public static LDK2DHeightmapTerrain CreateTerrain(GameObject parent)
         {
             var go = new GameObject("高度场地形");
             GameObjectUtility.SetParentAndAlign(go, parent);
@@ -2323,7 +2323,7 @@ namespace Terrain2D.EditorTools
 
             go.AddComponent<MeshFilter>();
             go.AddComponent<MeshRenderer>();
-            var terrain = go.AddComponent<HeightmapTerrain2D>();
+            var terrain = go.AddComponent<LDK2DHeightmapTerrain>();
             terrain.Generate();
 
             // 只在没有父物体时摆到视口中心。从 Hierarchy 右键「创建为子物体」进来时
@@ -2342,7 +2342,7 @@ namespace Terrain2D.EditorTools
         /// 看上去偏右半个身位。所以左移半个宽度，让它在视口里真正居中。
         /// Y 同理，用 baseHeight 对齐 —— 地表是绕着 baseHeight 起伏的。
         /// </summary>
-        static void PlaceAtViewCenter(GameObject go, HeightmapTerrain2D terrain)
+        static void PlaceAtViewCenter(GameObject go, LDK2DHeightmapTerrain terrain)
         {
             var view = SceneView.lastActiveSceneView;
             if (view == null) return;

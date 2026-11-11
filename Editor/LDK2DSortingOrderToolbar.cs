@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace Terrain2D.EditorTools
+namespace LDK2D.EditorTools
 {
     /// <summary>
     /// Draws the two things that live outside the per-object editors: the fixed stage bar in
@@ -13,7 +13,7 @@ namespace Terrain2D.EditorTools
     ///   左下角  固定栏 —— 关卡设计 + 搭建 / 测试 / 资产替换。**永远在**，
     ///           因为它说的是"这块关卡走到哪一步"，不是"当前选中了什么"。
     ///   左上角  面板 —— 当前阶段具体要用的工具。内容随选择变：
-    ///           选中地形时由 HeightmapTerrain2DEditor 画（阶段工具），
+    ///           选中地形时由 LDK2DHeightmapTerrainEditor 画（阶段工具），
     ///           选中别的 2D 物体时由这里画（层级 / Z / 颜色），
     ///           什么都没选时这里只放该阶段的第一个动作。
     ///
@@ -23,7 +23,7 @@ namespace Terrain2D.EditorTools
     /// 两块地方都只画在左上/左下，靠 CollectSelection 对地形让位来避免和地形面板重叠。
     /// </summary>
     [InitializeOnLoad]
-    internal static class SortingOrderToolbar
+    internal static class LDK2DSortingOrderToolbar
     {
         static readonly List<Renderer> Selected = new List<Renderer>();
 
@@ -36,16 +36,16 @@ namespace Terrain2D.EditorTools
         // object has no renderer" want different behaviour.
         static bool _selectionEmpty = true;
 
-        // Must match the [MenuItem] paths in Terrain2DToolsEditor exactly.
-        const string CreateTerrainMenu = "GameObject/地形 2D/创建高度场地形";
-        const string CreatePlayerMenu = "GameObject/地形 2D/创建测试角色";
+        // Must match the [MenuItem] paths in LDK2DToolsEditor exactly.
+        const string CreateTerrainMenu = "GameObject/LDK2D/创建高度场地形";
+        const string CreatePlayerMenu = "GameObject/LDK2D/创建测试角色";
 
         // 固定栏只装标题 + 三段选择器，所以宽度是算出来的而不是撑满：
         // 撑满会把整条视口底边都占掉，看着像条横幅。
         const float StageBarWidth = 250f;
         const float StageSelectorWidth = 170f;
 
-        static SortingOrderToolbar()
+        static LDK2DSortingOrderToolbar()
         {
             SceneView.duringSceneGui -= OnSceneGui;
             SceneView.duringSceneGui += OnSceneGui;
@@ -90,7 +90,7 @@ namespace Terrain2D.EditorTools
         static void DrawStageBar(SceneView view)
         {
             Handles.BeginGUI();
-            GUILayout.BeginArea(SceneToolbarLayout.Area(view.position, 60f));
+            GUILayout.BeginArea(LDK2DSceneToolbarLayout.Area(view.position, 60f));
             GUILayout.FlexibleSpace();
 
             GUILayout.BeginVertical("box", GUILayout.Width(StageBarWidth));
@@ -98,7 +98,7 @@ namespace Terrain2D.EditorTools
 
             GUILayout.Label("关卡设计", EditorStyles.miniBoldLabel);
 
-            if (TerrainStage.DrawSelector(StageSelectorWidth))
+            if (LDK2DTerrainStage.DrawSelector(StageSelectorWidth))
                 SceneView.RepaintAll();
 
             GUILayout.EndHorizontal();
@@ -111,21 +111,21 @@ namespace Terrain2D.EditorTools
         /// <summary>
         /// 左上角面板：什么都没选的时候，只放当前阶段"最想做的第一件事"。
         ///
-        /// 同一个位置在选中地形时由 HeightmapTerrain2DEditor 画完整工具，
+        /// 同一个位置在选中地形时由 LDK2DHeightmapTerrainEditor 画完整工具，
         /// 两者二选一 —— 靠 CollectSelection 对地形让位来保证不重叠。
         /// </summary>
         static void DrawStageActionPanel(SceneView view)
         {
             Handles.BeginGUI();
-            GUILayout.BeginArea(SceneToolbarLayout.Panel(view.position, SceneToolbarLayout.PanelWidth));
+            GUILayout.BeginArea(LDK2DSceneToolbarLayout.Panel(view.position, LDK2DSceneToolbarLayout.PanelWidth));
             GUILayout.BeginVertical("box");
 
-            GUILayout.Label(TerrainStage.Labels[(int)TerrainStage.Current],
+            GUILayout.Label(LDK2DTerrainStage.Labels[(int)LDK2DTerrainStage.Current],
                             EditorStyles.miniBoldLabel);
 
-            switch (TerrainStage.Current)
+            switch (LDK2DTerrainStage.Current)
             {
-                case WorkStage.Test:
+                case LDK2DWorkStage.Test:
                 {
                     // 先选镜头怎么跟，再建角色。角色和镜头是一套测试装备 ——
                     // 建完再选的话，按下 Play 的头两秒人是跑出画面的。
@@ -135,12 +135,12 @@ namespace Terrain2D.EditorTools
 
                     EditorGUI.BeginChangeCheck();
                     int picked = EditorGUILayout.Popup(
-                        (int)TestCameraPrefs.Mode, TestCameraPrefs.Labels,
+                        (int)LDK2DTestCameraPrefs.Mode, LDK2DTestCameraPrefs.Labels,
                         EditorStyles.popup, GUILayout.Width(78f));
 
                     if (EditorGUI.EndChangeCheck())
                     {
-                        TestCameraPrefs.Mode = (TestCameraMode)picked;
+                        LDK2DTestCameraPrefs.Mode = (LDK2DTestCameraMode)picked;
                         SceneView.RepaintAll();
                     }
 
@@ -148,21 +148,21 @@ namespace Terrain2D.EditorTools
                     GUILayout.EndHorizontal();
 
                     // 按钮上带着模式名，免得"我明明选了固定怎么还跟着"这种误会。
-                    if (GUILayout.Button("创建测试角色（" + TestCameraPrefs.ModeLabel + "）",
+                    if (GUILayout.Button("创建测试角色（" + LDK2DTestCameraPrefs.ModeLabel + "）",
                                          EditorStyles.miniButton))
                         EditorApplication.ExecuteMenuItem(CreatePlayerMenu);
 
                     // 占位标记：不管有没有选中地形，测试阶段都能造。
                     // 在搭关卡的时候人经常什么都不选（刚按完 Esc），要是非得先点一块
                     // 地形才能造敌人，这个入口就白放了。
-                    DrawActorRow(ActorKind.Enemy);
-                    DrawActorRow(ActorKind.Npc);
-                    DrawActorRow(ActorKind.Reward);
+                    DrawActorRow(LDK2DActorKind.Enemy);
+                    DrawActorRow(LDK2DActorKind.Npc);
+                    DrawActorRow(LDK2DActorKind.Reward);
 
                     break;
                 }
 
-                case WorkStage.Asset:
+                case LDK2DWorkStage.Asset:
                     // 资产替换阶段没有"凭空造一个东西"的动作 —— 它的起点是选中一块
                     // 已经搭好的地形，所以这里只能给一句提示。
                     GUILayout.Label("选中地形后，这里显示 UV 与材质。",
@@ -173,18 +173,18 @@ namespace Terrain2D.EditorTools
                     // 而且人检查整体效果时通常什么都不选 —— 放在选中地形的面板里，
                     // 等于要先点一块地形才能看整层，多绕一步。
                     //
-                    // 走 SceneToolbarLayout 上的委托而不是直接调 SceneDepthVisibility：
+                    // 走 LDK2DSceneToolbarLayout 上的委托而不是直接调 LDK2DSceneDepthVisibility：
                     // 这个文件比那个老，旧文件引用新类型会在「先编译、后导入」那一轮
                     // 报 does not contain a definition。为 null 时这一段跳过。
-                    if (SceneToolbarLayout.AssetPanelExtra != null)
-                        SceneToolbarLayout.AssetPanelExtra();
+                    if (LDK2DSceneToolbarLayout.AssetPanelExtra != null)
+                        LDK2DSceneToolbarLayout.AssetPanelExtra();
 
                     break;
 
                 default:
                     if (GUILayout.Button("创建高度场地形", EditorStyles.miniButton))
                     {
-                        // 走菜单路径而不是直接调 HeightmapTerrain2DEditor.CreateTerrain()：
+                        // 走菜单路径而不是直接调 LDK2DHeightmapTerrainEditor.CreateTerrain()：
                         // 后者让两个文件产生编译期依赖，而 Unity 的增量编译不止一次出现
                         // "先编译、后导入"，于是报 'does not contain a definition'。
                         // 字符串调用没有这个问题。
@@ -205,7 +205,7 @@ namespace Terrain2D.EditorTools
         static void DrawSelectionPanel(SceneView view)
         {
             Handles.BeginGUI();
-            GUILayout.BeginArea(SceneToolbarLayout.Panel(view.position, SceneToolbarLayout.PanelWidth));
+            GUILayout.BeginArea(LDK2DSceneToolbarLayout.Panel(view.position, LDK2DSceneToolbarLayout.PanelWidth));
             GUILayout.BeginVertical("box");
 
             GUILayout.Label(
@@ -241,7 +241,7 @@ namespace Terrain2D.EditorTools
 
             // 命名保存的 Z（背景 / 地面 / 前景…），省得记数字。
             if (GUILayout.Button("▾", EditorStyles.miniButton, GUILayout.Width(18f)))
-                DepthPresets.ShowMenu(Selected[0].transform.position.z, ApplyZ);
+                LDK2DDepthPresets.ShowMenu(Selected[0].transform.position.z, ApplyZ);
 
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
@@ -262,7 +262,7 @@ namespace Terrain2D.EditorTools
                 // Saved colours. The picker itself cannot hold names, so this is where a
                 // palette lives.
                 if (GUILayout.Button("▾", EditorStyles.miniButton, GUILayout.Width(18f)))
-                    ColorPalette.ShowMenu(GetColor(Selected[0]), ApplyColor);
+                    LDK2DColorPalette.ShowMenu(GetColor(Selected[0]), ApplyColor);
 
                 GUILayout.FlexibleSpace();
                 GUILayout.EndHorizontal();
@@ -318,7 +318,7 @@ namespace Terrain2D.EditorTools
             for (int i = 0; i < objects.Length; i++)
             {
                 if (objects[i] == null) continue;
-                if (objects[i].GetComponentInParent<HeightmapTerrain2D>() != null) return;
+                if (objects[i].GetComponentInParent<LDK2DHeightmapTerrain>() != null) return;
             }
 
             for (int i = 0; i < objects.Length; i++)
@@ -480,7 +480,7 @@ namespace Terrain2D.EditorTools
         /// 面板上给的是"有个碰撞体"，不是"猜你要哪种"。
         ///
         /// 地形不归这里管：它自己会生成 `PolygonCollider2D`
-        /// （`HeightmapTerrain2D.BuildColliders`），而且选中地形时这块面板根本不画。
+        /// （`LDK2DHeightmapTerrain.BuildColliders`），而且选中地形时这块面板根本不画。
         /// </summary>
         static Collider2D AddBoxCollider(Renderer renderer)
         {
@@ -515,7 +515,7 @@ namespace Terrain2D.EditorTools
         // ------------------------------------------------------------------ 颜色
         //
         // 颜色存在哪，取决于物体是什么：
-        //   本包自己的网格（PolygonMesh2D / HeightmapTerrain2D）→ 组件上的 color 字段，
+        //   本包自己的网格（LDK2DPolygonMesh / LDK2DHeightmapTerrain）→ 组件上的 color 字段，
         //       改完调 ApplyVisuals() 刷到渲染器上；
         //   SpriteRenderer → Unity 自己的 color 属性，直接改，Inspector 里会同步显示；
         //   其他渲染器 → 不动。没有可靠的"每物体一份"的写法，与其乱猜不如不显示。
@@ -530,16 +530,16 @@ namespace Terrain2D.EditorTools
         static bool SupportsColor(Renderer renderer)
         {
             return renderer is SpriteRenderer
-                || renderer.GetComponent<PolygonMesh2D>() != null
-                || renderer.GetComponent<HeightmapTerrain2D>() != null;
+                || renderer.GetComponent<LDK2DPolygonMesh>() != null
+                || renderer.GetComponent<LDK2DHeightmapTerrain>() != null;
         }
 
         static Color GetColor(Renderer renderer)
         {
-            var terrain = renderer.GetComponent<HeightmapTerrain2D>();
+            var terrain = renderer.GetComponent<LDK2DHeightmapTerrain>();
             if (terrain != null) return terrain.color;
 
-            var polygon = renderer.GetComponent<PolygonMesh2D>();
+            var polygon = renderer.GetComponent<LDK2DPolygonMesh>();
             if (polygon != null) return polygon.color;
 
             var sprite = renderer as SpriteRenderer;
@@ -554,7 +554,7 @@ namespace Terrain2D.EditorTools
             {
                 var renderer = Selected[i];
 
-                var terrain = renderer.GetComponent<HeightmapTerrain2D>();
+                var terrain = renderer.GetComponent<LDK2DHeightmapTerrain>();
                 if (terrain != null)
                 {
                     Undo.RecordObject(terrain, "改颜色");
@@ -564,7 +564,7 @@ namespace Terrain2D.EditorTools
                     continue;
                 }
 
-                var polygon = renderer.GetComponent<PolygonMesh2D>();
+                var polygon = renderer.GetComponent<LDK2DPolygonMesh>();
                 if (polygon != null)
                 {
                     Undo.RecordObject(polygon, "改颜色");
@@ -596,16 +596,16 @@ namespace Terrain2D.EditorTools
         /// 创建出来的物体**不进选中状态**：选中新物体会让面板立刻换成物体属性，
         /// 点一下按钮工具就没了 —— 改用 PingObject 闪一下 Hierarchy。
         /// </summary>
-        static void DrawActorRow(ActorKind kind)
+        static void DrawActorRow(LDK2DActorKind kind)
         {
-            string[] types = TestActor2D.TypesOf(kind);
+            string[] types = LDK2DTestActor.TypesOf(kind);
             string prefKey = "Terrain2D.ActorType." + (int)kind;
 
             int index = Mathf.Clamp(EditorPrefs.GetInt(prefKey, 0), 0, types.Length - 1);
 
             GUILayout.BeginHorizontal();
 
-            GUILayout.Label(TestActor2D.LabelOf(kind), EditorStyles.miniLabel, GUILayout.Width(46f));
+            GUILayout.Label(LDK2DTestActor.LabelOf(kind), EditorStyles.miniLabel, GUILayout.Width(46f));
 
             EditorGUI.BeginChangeCheck();
             int picked = EditorGUILayout.Popup(index, types, EditorStyles.popup, GUILayout.Width(84f));
@@ -622,7 +622,7 @@ namespace Terrain2D.EditorTools
 
                 position.z = 0f;
 
-                var actor = TestActor2D.Create(kind, picked, position);
+                var actor = LDK2DTestActor.Create(kind, picked, position);
 
                 // 不能用 return 提前退出 —— 会把下面的 EndHorizontal 跳过。
                 if (actor != null)

@@ -5,6 +5,13 @@ a collider, and a **cheap height query** out of it.
 
 Built for platformers that need terrain they can *ask questions about* and *blow holes in*.
 
+**Naming**: the namespace is `LDK2D` / `LDK2D.EditorTools`, and every type and file carries the
+`LDK2D` prefix (`LDK2DHeightmapTerrain`, `LDK2DPolygonMesh`, …) so dropping this into another
+project will not collide with types already there. Menus live under `GameObject ▸ LDK2D ▸ …`.
+Two deliberate exceptions: `EditorPrefs` keys and the folder name still say `Terrain2D` —
+the keys are strings and cause no compile conflict, and renaming them would drop saved depth
+presets and palette entries.
+
 ---
 
 ## Why this, and not Sprite Shape or a tilemap
@@ -62,7 +69,7 @@ https://github.com/zhongxiaguchen/terrain2d.git
 
 ## Quick start
 
-1. Create one from **GameObject ▸ 地形 2D ▸ 创建高度场地形**.
+1. Create one from **GameObject ▸ LDK2D ▸ 创建高度场地形**.
 2. Select it — the editing toolbar appears at the bottom of the Scene view.
 3. Drag the dots to sculpt.
 
@@ -81,11 +88,11 @@ The toolbar also carries the terrain's sorting order and colour, plus one-click
 This is the part that a shape-editing tool cannot give you.
 
 ```csharp
-using Terrain2D;
+using LDK2D;
 
 public class Spawner : MonoBehaviour
 {
-    public HeightmapTerrain2D terrain;
+    public LDK2DHeightmapTerrain terrain;
     public GameObject tree;
 
     void Start()
@@ -152,13 +159,13 @@ back on itself. That path is gone.
 Note that turning the collider off disables the component rather than deleting it, and any
 leftover `EdgeCollider2D` from an older version is disabled automatically.
 
-## The other component: PolygonMesh2D
+## The other component: LDK2DPolygonMesh
 
 For anything that is not a height field — a cave, an arbitrary outline with holes. It reads
 a `PolygonCollider2D` and renders it as a mesh, so you edit the shape with Unity's own
 **Edit Collider** and the mesh follows.
 
-Note the direction is reversed compared to `HeightmapTerrain2D`: this component *reads* a
+Note the direction is reversed compared to `LDK2DHeightmapTerrain`: this component *reads* a
 collider, it does not create one.
 
 ## Field reference

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Terrain2D
+namespace LDK2D
 {
     /// <summary>
     /// Ear-clipping triangulation for a single simple polygon.
@@ -15,7 +15,7 @@ namespace Terrain2D
     /// Complexity is O(n^2) worst case, which is fine for terrain outlines
     /// (tens to a few hundred vertices).
     /// </summary>
-    public static class Triangulator
+    public static class LDK2DTriangulator
     {
         const float Eps = 1e-9f;
 

@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace Terrain2D.EditorTools
+namespace LDK2D.EditorTools
 {
     /// <summary>One saved colour.</summary>
     [Serializable]
-    internal class PaletteEntry
+    internal class LDK2DPaletteEntry
     {
         public string name;
         public Color color;
@@ -15,9 +15,9 @@ namespace Terrain2D.EditorTools
 
     /// <summary>Wrapper so JsonUtility has a single root object to serialise.</summary>
     [Serializable]
-    internal class PaletteStore
+    internal class LDK2DPaletteStore
     {
-        public List<PaletteEntry> entries = new List<PaletteEntry>();
+        public List<LDK2DPaletteEntry> entries = new List<LDK2DPaletteEntry>();
     }
 
     /// <summary>
@@ -28,13 +28,13 @@ namespace Terrain2D.EditorTools
     /// merges badly between machines. The trade-off is that it does not travel with the
     /// project — if a team ever wants a shared palette, that is a separate, deliberate feature.
     /// </summary>
-    internal static class ColorPalette
+    internal static class LDK2DColorPalette
     {
         const string PrefKey = "Terrain2D.ColorPalette";
 
-        static PaletteStore _store;
+        static LDK2DPaletteStore _store;
 
-        static PaletteStore Data
+        static LDK2DPaletteStore Data
         {
             get
             {
@@ -44,11 +44,11 @@ namespace Terrain2D.EditorTools
                 if (!string.IsNullOrEmpty(json))
                 {
                     // A corrupted pref must not take the whole window down.
-                    try { _store = JsonUtility.FromJson<PaletteStore>(json); }
+                    try { _store = JsonUtility.FromJson<LDK2DPaletteStore>(json); }
                     catch (Exception) { _store = null; }
                 }
 
-                return _store ?? (_store = new PaletteStore());
+                return _store ?? (_store = new LDK2DPaletteStore());
             }
         }
 
@@ -74,7 +74,7 @@ namespace Terrain2D.EditorTools
                 return;
             }
 
-            entries.Add(new PaletteEntry { name = name, color = color });
+            entries.Add(new LDK2DPaletteEntry { name = name, color = color });
             Flush();
         }
 
@@ -100,16 +100,16 @@ namespace Terrain2D.EditorTools
                 for (int i = 0; i < entries.Count; i++)
                 {
                     // Local copy: the lambda must not capture the loop variable.
-                    PaletteEntry entry = entries[i];
+                    LDK2DPaletteEntry entry = entries[i];
                     menu.AddItem(new GUIContent(entry.name), false, () => onPick(entry.color));
                 }
             }
 
             menu.AddSeparator(string.Empty);
             menu.AddItem(new GUIContent("保存当前颜色…"), false,
-                () => NameDialog.Show("保存颜色", name =>
+                () => LDK2DNameDialog.Show("保存颜色", name =>
                 {
-                    ColorPalette.Add(name, current);
+                    LDK2DColorPalette.Add(name, current);
                     onPick(current);
                 }));
 

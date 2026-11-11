@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace Terrain2D.EditorTools
+namespace LDK2D.EditorTools
 {
     /// <summary>One saved Z value.</summary>
     [Serializable]
-    internal class DepthPreset
+    internal class LDK2DDepthPreset
     {
         public string name;
         public float value;
@@ -15,25 +15,25 @@ namespace Terrain2D.EditorTools
 
     /// <summary>Wrapper so JsonUtility has a single root object to serialise.</summary>
     [Serializable]
-    internal class DepthPresetStore
+    internal class LDK2DDepthPresetStore
     {
-        public List<DepthPreset> entries = new List<DepthPreset>();
+        public List<LDK2DDepthPreset> entries = new List<LDK2DDepthPreset>();
     }
 
     /// <summary>
     /// Named Z values — "background / ground / foreground" without remembering the numbers.
     ///
-    /// Same storage decision as <see cref="ColorPalette"/>: EditorPrefs, so it belongs to this
+    /// Same storage decision as <see cref="LDK2DColorPalette"/>: EditorPrefs, so it belongs to this
     /// user on this machine rather than travelling with the project. A depth table in the
     /// project folder would show up in version control and merge badly between machines.
     /// </summary>
-    internal static class DepthPresets
+    internal static class LDK2DDepthPresets
     {
         const string PrefKey = "Terrain2D.DepthPresets";
 
-        static DepthPresetStore _store;
+        static LDK2DDepthPresetStore _store;
 
-        static DepthPresetStore Data
+        static LDK2DDepthPresetStore Data
         {
             get
             {
@@ -43,11 +43,11 @@ namespace Terrain2D.EditorTools
                 if (!string.IsNullOrEmpty(json))
                 {
                     // A corrupted pref must not take the window down.
-                    try { _store = JsonUtility.FromJson<DepthPresetStore>(json); }
+                    try { _store = JsonUtility.FromJson<LDK2DDepthPresetStore>(json); }
                     catch (Exception) { _store = null; }
                 }
 
-                return _store ?? (_store = new DepthPresetStore());
+                return _store ?? (_store = new LDK2DDepthPresetStore());
             }
         }
 
@@ -68,7 +68,7 @@ namespace Terrain2D.EditorTools
                 return;
             }
 
-            entries.Add(new DepthPreset { name = name, value = value });
+            entries.Add(new LDK2DDepthPreset { name = name, value = value });
             Flush();
         }
 
@@ -124,7 +124,7 @@ namespace Terrain2D.EditorTools
                 for (int i = 0; i < entries.Count; i++)
                 {
                     // Local copy: the lambda must not capture the loop variable.
-                    DepthPreset preset = entries[i];
+                    LDK2DDepthPreset preset = entries[i];
 
                     // The number is shown next to the name because a Z value is meaningless
                     // to look at in isolation - you need to see what it resolves to.
@@ -136,7 +136,7 @@ namespace Terrain2D.EditorTools
                 // 删除单独收进子菜单。存好的档位是设计时定的，误删比误选代价大得多。
                 for (int i = 0; i < entries.Count; i++)
                 {
-                    DepthPreset preset = entries[i];
+                    LDK2DDepthPreset preset = entries[i];
                     menu.AddItem(new GUIContent("删除预设/" + preset.name), false,
                         () => Remove(preset.name));
                 }
@@ -158,7 +158,7 @@ namespace Terrain2D.EditorTools
 
             menu.AddSeparator(string.Empty);
             menu.AddItem(new GUIContent("保存当前 Z…"), false,
-                () => NameDialog.Show("保存 Z", name => DepthPresets.Add(name, current)));
+                () => LDK2DNameDialog.Show("保存 Z", name => LDK2DDepthPresets.Add(name, current)));
 
             menu.ShowAsContext();
         }

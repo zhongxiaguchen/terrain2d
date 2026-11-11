@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace Terrain2D.EditorTools
+namespace LDK2D.EditorTools
 {
     /// <summary>
     /// 视口右下角的「碰撞体」开关：把场景里**实际生效的碰撞轮廓**画出来。
@@ -24,7 +24,7 @@ namespace Terrain2D.EditorTools
     /// 画的时候关掉深度测试，保证它压在网格上面看得见。
     /// </summary>
     [InitializeOnLoad]
-    internal static class ColliderDisplayOverlay
+    internal static class LDK2DColliderDisplayOverlay
     {
         const string PrefKey = "Terrain2D.ShowColliders";
 
@@ -60,7 +60,7 @@ namespace Terrain2D.EditorTools
             }
         }
 
-        static ColliderDisplayOverlay()
+        static LDK2DColliderDisplayOverlay()
         {
             _show = EditorPrefs.GetBool(PrefKey, false);
 
@@ -93,8 +93,8 @@ namespace Terrain2D.EditorTools
             float height = EditorGUIUtility.singleLineHeight + 10f;
 
             Rect rect = new Rect(
-                view.position.width - width - SceneToolbarLayout.SideInset,
-                view.position.height - height - SceneToolbarLayout.BottomInset,
+                view.position.width - width - LDK2DSceneToolbarLayout.SideInset,
+                view.position.height - height - LDK2DSceneToolbarLayout.BottomInset,
                 width,
                 height);
 

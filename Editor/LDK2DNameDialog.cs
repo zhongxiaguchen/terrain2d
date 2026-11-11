@@ -2,7 +2,7 @@ using System;
 using UnityEditor;
 using UnityEngine;
 
-namespace Terrain2D.EditorTools
+namespace LDK2D.EditorTools
 {
     /// <summary>
     /// A one-field "give this a name" prompt.
@@ -11,7 +11,7 @@ namespace Terrain2D.EditorTools
     /// need exactly the same thing — a title, one text field, OK / Cancel. Shared so the two
     /// features do not each carry their own copy.
     /// </summary>
-    internal class NameDialog : EditorWindow
+    internal class LDK2DNameDialog : EditorWindow
     {
         const float Width = 300f;
         const float Height = 88f;
@@ -21,7 +21,7 @@ namespace Terrain2D.EditorTools
 
         public static void Show(string title, Action<string> onAccept)
         {
-            var window = CreateInstance<NameDialog>();
+            var window = CreateInstance<LDK2DNameDialog>();
             window.titleContent = new GUIContent(title);
             window._onAccept = onAccept;
             window.minSize = new Vector2(Width, Height);

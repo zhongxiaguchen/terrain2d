@@ -1,13 +1,13 @@
 using UnityEditor;
 using UnityEngine;
 
-namespace Terrain2D.EditorTools
+namespace LDK2D.EditorTools
 {
     /// <summary>
     /// 关卡制作的三段路。工具栏按阶段切换 —— 三个阶段的关注点完全不同，
     /// 把所有按钮平铺在一起，每次都得从头找一遍。
     /// </summary>
-    internal enum WorkStage
+    internal enum LDK2DWorkStage
     {
         /// <summary>搭建：改形状、定分层。灰盒阶段。</summary>
         Blockout = 0,
@@ -23,13 +23,13 @@ namespace Terrain2D.EditorTools
     /// 阶段状态的唯一持有者，以及那条阶段选择器唯一的画法。
     ///
     /// 为什么值得单独拆一个文件：视口里有两处要用阶段 ——
-    /// 左下角的固定栏（SortingOrderToolbar）和左上角的阶段面板
-    /// （HeightmapTerrain2DEditor / SortingOrderToolbar 都会画）。阶段只有一个值，
+    /// 左下角的固定栏（LDK2DSortingOrderToolbar）和左上角的阶段面板
+    /// （LDK2DHeightmapTerrainEditor / LDK2DSortingOrderToolbar 都会画）。阶段只有一个值，
     /// 所以状态和画法都不能挂在任何一个 Editor 实例上。
     /// </summary>
-    internal static class TerrainStage
+    internal static class LDK2DTerrainStage
     {
-        /// <summary>顺序必须和 <see cref="WorkStage"/> 一致。</summary>
+        /// <summary>顺序必须和 <see cref="LDK2DWorkStage"/> 一致。</summary>
         public static readonly string[] Labels = { "搭建", "测试", "资产替换" };
 
         const string Key = "Terrain2D.Stage";
@@ -41,12 +41,12 @@ namespace Terrain2D.EditorTools
         /// 存 EditorPrefs 而不是 SessionState：这个东西要跨 Editor 重启活着。
         /// 早上打开工程不该重新选一次"我在做资产替换"。
         /// </summary>
-        public static WorkStage Current
+        public static LDK2DWorkStage Current
         {
             get
             {
-                int raw = EditorPrefs.GetInt(Key, (int)WorkStage.Blockout);
-                return (WorkStage)Mathf.Clamp(raw, 0, Labels.Length - 1);
+                int raw = EditorPrefs.GetInt(Key, (int)LDK2DWorkStage.Blockout);
+                return (LDK2DWorkStage)Mathf.Clamp(raw, 0, Labels.Length - 1);
             }
             set
             {
@@ -69,7 +69,7 @@ namespace Terrain2D.EditorTools
 
             if (picked == (int)Current) return false;
 
-            Current = (WorkStage)picked;
+            Current = (LDK2DWorkStage)picked;
             return true;
         }
     }

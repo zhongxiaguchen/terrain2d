@@ -1,7 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 
-namespace Terrain2D.EditorTools
+namespace LDK2D.EditorTools
 {
     /// <summary>
     /// 视口里两块浮层的定位：左下角的固定栏，和左上角的阶段面板。
@@ -17,7 +17,7 @@ namespace Terrain2D.EditorTools
     /// 写死的 32px 迟早会跟它打架，或者反过来在没浮层的时候悬在半空。
     /// 现在按 singleLineHeight 换算，跟着 UI Scale 一起变。
     /// </summary>
-    internal static class SceneToolbarLayout
+    internal static class LDK2DSceneToolbarLayout
     {
         /// <summary>左右留白。</summary>
         public const float SideInset = 8f;
@@ -27,7 +27,7 @@ namespace Terrain2D.EditorTools
         /// slider 加数值，再宽就开始挡视线。
         ///
         /// 放在这里而不是放在两个编辑器类里：面板有两个绘制者（选中地形时是
-        /// HeightmapTerrain2DEditor，没选时是 SortingOrderToolbar），宽度必须一致，
+        /// LDK2DHeightmapTerrainEditor，没选时是 LDK2DSortingOrderToolbar），宽度必须一致，
         /// 否则切换选择时面板会跳一下。
         /// </summary>
         public const float PanelWidth = 280f;
@@ -39,10 +39,10 @@ namespace Terrain2D.EditorTools
         }
 
         /// <summary>
-        /// 资产替换面板底部追加的内容，由 <c>SceneDepthVisibility</c> 在域加载时挂上来。
+        /// 资产替换面板底部追加的内容，由 <c>LDK2DSceneDepthVisibility</c> 在域加载时挂上来。
         ///
-        /// 为什么不直接调用：`Terrain2DToolsEditor` 这个文件比
-        /// `SceneDepthVisibility` 老，**旧文件引用新类型**会在 Unity 增量编译
+        /// 为什么不直接调用：`LDK2DToolsEditor` 这个文件比
+        /// `LDK2DSceneDepthVisibility` 老，**旧文件引用新类型**会在 Unity 增量编译
         /// 「先编译、后导入」的那一轮报 `does not contain a definition`。
         /// 把委托放在这个两边都已经引用的中立类上，新旧文件就都只引用旧类型了。
         ///
