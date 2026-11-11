@@ -202,6 +202,29 @@ collider, it does not create one.
 | `uvScale` | 0.5 | planar UV mapping |
 | `flipWinding` | off | turn on if backface culling hides the terrain |
 
+## Live editing (edit while the game runs)
+
+In the **Test** stage with nothing selected, tick **实时编辑** (live editing), then press Play.
+
+While playing you can drag terrain points, tweak Inspector fields, and place enemy / NPC /
+reward markers — and the changes **survive when you stop**. Without the toggle, terrain
+handles are not drawn during Play at all, so the viewport stays clean.
+
+This has to run in real Play mode: Unity only raises `OnCollisionEnter2D` /
+`OnTriggerEnter2D` in Play mode, so a hand-rolled edit-mode simulation would silently break
+enemy contact damage, projectiles and trigger pickups.
+
+Under the hood `LDK2DLiveEditSync` reconciles three things that Unity otherwise rolls back:
+
+| Done during Play | On exit, Unity | What the tool does |
+|---|---|---|
+| edit | restores the pre-Play data | writes the Play-mode data back, then `Rebuild()` |
+| delete | **resurrects** the object | deletes it again |
+| create | **destroys** the object | recreates it from serialized data |
+
+The whole write-back is a single undo step. Nothing is written if nothing changed, so an
+empty play session does not dirty the scene.
+
 ## Known limitations
 
 - The surface cannot overhang (see above).

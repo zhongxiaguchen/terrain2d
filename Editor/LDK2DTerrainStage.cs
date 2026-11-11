@@ -34,6 +34,8 @@ namespace LDK2D.EditorTools
 
         const string Key = "Terrain2D.Stage";
 
+        const string LiveEditKey = "Terrain2D.LiveEdit";
+
         /// <summary>
         /// 当前阶段是**全局**的，不是每个地形一份 —— 阶段是"这块关卡走到哪一步了"，
         /// 不是某个物体的属性。场景里放了三块地形，选中哪块都不该把阶段重置。
@@ -52,6 +54,24 @@ namespace LDK2D.EditorTools
             {
                 EditorPrefs.SetInt(Key, Mathf.Clamp((int)value, 0, Labels.Length - 1));
             }
+        }
+
+        /// <summary>
+        /// 实时编辑：Play 模式下保留地形手柄，退出 Play 时把改动写回场景。
+        ///
+        /// **默认关**。关着的时候 Play 就是纯跑图 —— 视口干净，也不会有
+        /// 「我改了半天，一退出全没了」这种事。
+        ///
+        /// **只当开关，不进 Play。** 进不进 Play 还是按 Unity 自己的 Play 键 ——
+        /// 编辑器里已经有一套播放/暂停/停止控件，再在面板上放一遍只会打架。
+        ///
+        /// 存 EditorPrefs 而不是 SessionState：这是「我平时怎么测关卡」的偏好，
+        /// 和阶段一样要跨重启活着。
+        /// </summary>
+        public static bool LiveEdit
+        {
+            get { return EditorPrefs.GetBool(LiveEditKey, false); }
+            set { EditorPrefs.SetBool(LiveEditKey, value); }
         }
 
         /// <summary>

@@ -339,6 +339,22 @@ namespace LDK2D.EditorTools
         {
             var terrain = (LDK2DHeightmapTerrain)target;
 
+            // Play 模式下没开「实时编辑」就只留面板，不画任何手柄。
+            //
+            // 两个理由：
+            //   1. 跑图的时候视口要干净 —— 采样点、边界方块、轮廓线全都在，
+            //      根本看不清角色在跳什么。
+            //   2. 这时候改了也**不会保留**（Unity 退出 Play 会把场景恢复成进 Play
+            //      前的快照），画出来只会让人以为能改，改完白改。
+            //
+            // 面板留着，因为「显示 UV 网格」「显示控制点」这些开关还在里面，
+            // 跑图时突然整个面板消失反而更奇怪。
+            if (Application.isPlaying && !LDK2DTerrainStage.LiveEdit)
+            {
+                DrawStagePanel(terrain);
+                return;
+            }
+
             int count = terrain.sampleCount;
             if (count < 2) return;
 
