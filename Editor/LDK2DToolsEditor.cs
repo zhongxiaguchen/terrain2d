@@ -106,6 +106,13 @@ namespace LDK2D.EditorTools
         // 不存引用的话 EndDrag 拿不到 —— 那时候选中可能已经变了。
         LDK2DHeightmapTerrain _dragTerrain;
 
+        // 本次拖动独占的撤销组。整次拖动 = 一步 Ctrl+Z。
+        //
+        // 不自己开组的话，这次拖动会挂在"当前组"上 —— 而当前组是谁的、什么时候
+        // 闭合，取决于拖动之前点过什么。组一旦被别的操作污染，快照就不再是
+        // "按下去那一刻"的状态，撤销就命中不了。
+        int _dragUndoGroup;
+
         int _dragIndex = -1;
         Vector2 _dragStartMouse;
         Vector3 _dragStartWorld;
@@ -1754,7 +1761,24 @@ namespace LDK2D.EditorTools
             _dragRightOffsetX = terrain.bottomRightOffsetX;
 
             GUIUtility.hotControl = DragControlId;
-            Undo.RecordObject(terrain, "雕刻地形");
+
+            // ---- 撤销：一次拖动 = 一步 Ctrl+Z ----
+            //
+            // 这里必须用 RegisterCompleteObjectUndo，不能用 RecordObject。
+            //
+            // RecordObject 记的是**字段级差异** —— 它拍一份，改完再比对，判断
+            // "这个对象变没变"。而拖点改的是 float[] _heights 里的单个元素
+            // （_heights[i] = 值，数组对象本身没换）。这种情况 RecordObject
+            // 可能判定成"没变化"，于是**压根不建撤销记录** —— 表现就是
+            // Ctrl+Z 完全没反应。而面板上改 color / amplitude 那种单字段操作
+            // 它认得出来，所以"其他的都正常，只有拖点撤不了"。
+            //
+            // RegisterCompleteObjectUndo 不管差异，直接把整个组件完整序列化一份
+            // 存进撤销栈，数组内容一定被拍进去。代价是一次多存几 KB，值。
+            Undo.IncrementCurrentGroup();
+            Undo.SetCurrentGroupName("雕刻地形");
+            _dragUndoGroup = Undo.GetCurrentGroup();
+            Undo.RegisterCompleteObjectUndo(terrain, "雕刻地形");
 
             // 告诉地形"开始拖了"：这之后碰撞体降到每 100ms 一次，
             // 视觉网格照常每帧重建。SetPath 要重建物理形状，是重建里最贵的一步。
@@ -1777,6 +1801,11 @@ namespace LDK2D.EditorTools
             _dragBaseBottom = null;
             _dragBaseTopOffsetX = null;
             _dragBaseBottomOffsetX = null;
+
+            // 把这次拖动产生的所有撤销操作收进同一个组。
+            // 不收的话，拖动期间每一次 Rebuild / SetDirty 都可能各自开一步，
+            // Ctrl+Z 就得按几十下才退得回去。
+            Undo.CollapseUndoOperations(_dragUndoGroup);
         }
 
         void ApplyDrag(LDK2DHeightmapTerrain terrain, Transform tr, Event e)

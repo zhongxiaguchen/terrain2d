@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-11-11
+
+### Fixed
+
+- **拖动地形点之后 Ctrl+Z 完全没反应**（`Editor/LDK2DToolsEditor.cs`）。
+
+  面板上改颜色、改参数都能撤，唯独拖点撤不了。原因是 `Undo.RecordObject`
+  记的是**字段级差异** —— 它先拍一份，改完再比对，判断"这个对象变没变"。
+
+  而拖点改的是 `float[] _heights` 里的**单个元素**（`_heights[i] = 值`，数组对象
+  本身没换）。这种情况 `RecordObject` 可能判定成"没变化"，于是**压根不建撤销
+  记录**。面板改 `color` / `amplitude` 那种单字段操作它认得出来，所以症状是
+  "其他的都正常，只有拖点撤不了"。
+
+  改用 `Undo.RegisterCompleteObjectUndo` —— 不管差异，直接把整个组件完整序列化
+  一份存进撤销栈，数组内容一定被拍进去。
+
+  顺带把拖动变成**独占的撤销组**：
+
+  | 以前 | 现在 |
+  |---|---|
+  | 挂在"当前组"上，组是谁的取决于拖动前点过什么 | `Undo.IncrementCurrentGroup()` 开新组 |
+  | 组永远不闭合 | `EndDrag` 里 `Undo.CollapseUndoOperations` 收尾 |
+  | 可能退成几十小步 | 整次拖动 = **一步** Ctrl+Z |
+
+### Notes
+
+- 只动了撤销登记，拖动逻辑、网格、碰撞体一行没改。
+- `RegisterCompleteObjectUndo` 比 `RecordObject` 多存一次完整序列化（几 KB），
+  但只在按下鼠标那一刻存一次，代价可以忽略。
+
+
 ## [0.19.0] - 2026-11-11
 
 ### Added
