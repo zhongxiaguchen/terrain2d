@@ -13,6 +13,10 @@ namespace LDK2D.EditorTools
     ///   - 拉到最右 = **整个场景刚好装下**（不是"大概"，是按所有 Renderer 的包围盒算出来的）
     ///   - 拉到最左 = 放到最大，约 25 倍变焦
     ///
+    /// **这条工具箱是常驻的**：场景里一个 Renderer 都没有时它照样画，只是滑块禁用。
+    /// 曾经写成"算不出包围盒就直接 return"，结果是空场景里右下角整块消失 ——
+    /// 新装包的人第一眼就以为没装上。常驻工具不该以"场景里恰好有东西"为前提。
+    ///
     /// 左边的眼睛图标是**标识**，不是按钮 —— 说明这条滑条管的是"视口看得见多大"，
     /// 跟旁边可能出现的其它工具箱条目区分开。**不要把它做成开关。**
     ///
@@ -69,7 +73,7 @@ namespace LDK2D.EditorTools
         /// 工具箱当前占据的矩形（视口坐标）。给别的工具判断"这一下点击是不是落在工具箱上"用 ——
         /// 不判断的话，点一下滑条会在场景里留下一个标记点。
         ///
-        /// 每帧开头清空：没有场景内容时工具箱根本不画，这时候不该有"上一个位置的残影"。
+        /// 每帧开头清空再重算：视口宽度、额外行高度都会变，留着上一帧的值会算错命中。
         /// </summary>
         public static Rect ToolboxRect;
 
@@ -104,17 +108,21 @@ namespace LDK2D.EditorTools
 
             ToolboxRect = new Rect();
 
+            // 算不出包围盒也要往下画 —— 只是滑块禁用。见类注释。
             Bounds bounds;
-            if (!TryGetSceneBounds(out bounds)) return;
+            bool hasBounds = TryGetSceneBounds(out bounds);
 
             float aspect = AspectOf(view);
-            float halfHeight = FitHalfHeight(bounds, aspect);
-            if (halfHeight <= 0f) return;
+            float fitHalfHeight = hasBounds ? FitHalfHeight(bounds, aspect) : 0f;
 
-            Draw(view, bounds, halfHeight);
+            // 包围盒退化成一点（场景里只有一个极小的东西）时，滑条两端都是 0，
+            // 拖了也不动。这种按"没有可框内容"处理，比画一根死滑条诚实。
+            if (fitHalfHeight <= 0f) hasBounds = false;
+
+            Draw(view, bounds, fitHalfHeight, hasBounds);
         }
 
-        static void Draw(SceneView view, Bounds bounds, float fitHalfHeight)
+        static void Draw(SceneView view, Bounds bounds, float fitHalfHeight, bool hasBounds)
         {
             float width = Mathf.Min(BarWidth, view.position.width * 0.5f);
             if (width < EyeWidth + 60f) return;
@@ -144,9 +152,26 @@ namespace LDK2D.EditorTools
 
             DrawEye();
 
-            float current = CurrentT(view, fitHalfHeight);
-            float next = GUILayout.HorizontalSlider(
-                current, 0f, 1f, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+            float current;
+            float next;
+
+            if (hasBounds)
+            {
+                current = CurrentT(view, fitHalfHeight);
+                next = GUILayout.HorizontalSlider(
+                    current, 0f, 1f, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+            }
+            else
+            {
+                // 场景里没有可见物体 —— "装下全场景"没有定义，滑条给了也拖不动。
+                // 但工具箱本身要一直在：位置、宽度、高度都不变，只是这一根禁用。
+                // 整块拿掉的话右下角会空一片，看着像功能没装上。
+                current = next = 0f;
+
+                using (new EditorGUI.DisabledScope(true))
+                    GUILayout.HorizontalSlider(
+                        0f, 0f, 1f, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+            }
 
             GUILayout.EndHorizontal();
 
@@ -158,6 +183,7 @@ namespace LDK2D.EditorTools
 
             Handles.EndGUI();
 
+            if (!hasBounds) return;
             if (Mathf.Approximately(next, current)) return;
 
             Apply(view, bounds, fitHalfHeight, next);
